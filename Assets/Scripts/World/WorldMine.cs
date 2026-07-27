@@ -126,7 +126,8 @@ namespace HommClone.World
             pole.name = "FlagPole";
             pole.transform.SetParent(transform, false);
             pole.transform.localPosition = new Vector3(0.35f, 0.9f, 0.35f);
-            pole.transform.localScale = new Vector3(0.08f, 0.6f, 0.08f);
+            var pRen = pole.GetComponent<Renderer>();
+            if (pRen != null) MaterialUtils.SetRendererColor(pRen, new Color(0.4f, 0.4f, 0.4f));
 
             // Flag Top
             GameObject flag = GameObject.CreatePrimitive(PrimitiveType.Cube);

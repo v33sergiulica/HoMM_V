@@ -31,3 +31,7 @@
 .DS_Store?
 ehthumbs.db
 Thumbs.db
+
+# Internal Local Documentation (Not visible on GitHub)
+Docs/BugFixing_Internal.md
+InternalNotes/

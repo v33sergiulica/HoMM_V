@@ -4,55 +4,40 @@ namespace HommClone.World
 {
     public static class MaterialUtils
     {
-        private static Shader _cachedShader;
-
-        public static Shader GetSafeShader()
-        {
-            if (_cachedShader != null) return _cachedShader;
-
-            _cachedShader = Shader.Find("Universal Render Pipeline/Lit");
-            if (_cachedShader == null) _cachedShader = Shader.Find("Universal Render Pipeline/Simple Lit");
-            if (_cachedShader == null) _cachedShader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (_cachedShader == null) _cachedShader = Shader.Find("Standard");
-            if (_cachedShader == null) _cachedShader = Shader.Find("Unlit/Color");
-            if (_cachedShader == null) _cachedShader = Shader.Find("Sprites/Default");
-
-            return _cachedShader;
-        }
-
         public static void SetRendererColor(Renderer renderer, Color color)
         {
             if (renderer == null) return;
 
-            Material mat = renderer.material;
-            if (mat == null)
+            // 1. Check if the renderer has a valid non-error material. If missing or magenta ErrorShader, assign Sprites/Default fallback
+            if (renderer.sharedMaterial == null || renderer.sharedMaterial.shader == null || renderer.sharedMaterial.shader.name.Contains("Error"))
             {
-                Shader shader = GetSafeShader();
-                if (shader != null) mat = new Material(shader);
-                else return;
-                renderer.material = mat;
+                Shader safeShader = Shader.Find("Universal Render Pipeline/Lit") 
+                                 ?? Shader.Find("Universal Render Pipeline/Unlit")
+                                 ?? Shader.Find("Sprites/Default") 
+                                 ?? Shader.Find("Unlit/Color");
+                if (safeShader != null)
+                {
+                    renderer.sharedMaterial = new Material(safeShader);
+                }
             }
 
-            // Set both URP BaseColor and Standard Color properties safely
-            if (mat.HasProperty("_BaseColor"))
-            {
-                mat.SetColor("_BaseColor", color);
-            }
-            if (mat.HasProperty("_Color"))
-            {
-                mat.SetColor("_Color", color);
-            }
-        }
+            // 2. Use MaterialPropertyBlock - the official Unity way to apply colors at runtime without shader stripping or pink textures
+            MaterialPropertyBlock block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            block.SetColor("_BaseColor", color);
+            block.SetColor("_Color", color);
+            renderer.SetPropertyBlock(block);
 
-        public static Material CreateColorMaterial(Color color)
-        {
-            Shader shader = GetSafeShader();
-            Material mat = shader != null ? new Material(shader) : new Material(Shader.Find("Sprites/Default"));
-            
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
-            if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
-
-            return mat;
+            // 3. Apply directly to material instance properties if supported
+            try
+            {
+                if (renderer.material != null)
+                {
+                    if (renderer.material.HasProperty("_BaseColor")) renderer.material.SetColor("_BaseColor", color);
+                    if (renderer.material.HasProperty("_Color")) renderer.material.SetColor("_Color", color);
+                }
+            }
+            catch { }
         }
     }
 }
