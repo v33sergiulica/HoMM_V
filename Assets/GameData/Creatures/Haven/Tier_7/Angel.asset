@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1292f3855a0446546b65d38a75b46b5c, type: 3}
+  m_Name: Angel
+  m_EditorClassIdentifier: 
+  creatureName: Angel
+  prefab: {fileID: 0}
+  icon: {fileID: 21300000, guid: a336c9531a1362c45a3c9cd008630d9e, type: 3}
+  faction: 0
+  tier: 7
+  weeklyGrowth: 1
+  maxHealth: 180
+  attack: 27
+  defense: 27
+  initiative: 11
+  speed: 6
+  minDamage: 45
+  maxDamage: 45
+  maxAmmo: 0
+  maxMana: 0
+  isRanged: 0
+  abilities:
+  - {fileID: 11400000, guid: 5882e9ef545f6544aaf70af9dc40ed78, type: 2}
+  - {fileID: 11400000, guid: 0f563f9641d52ab46a48552964e61016, type: 2}
+  customPowerMultiplier: 1
+  customPowerOffset: 0

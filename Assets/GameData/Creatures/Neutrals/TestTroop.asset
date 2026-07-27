@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1292f3855a0446546b65d38a75b46b5c, type: 3}
+  m_Name: TestTroop
+  m_EditorClassIdentifier: 
+  creatureName: TestTroop
+  prefab: {fileID: 0}
+  icon: {fileID: 10915, guid: 0000000000000000f000000000000000, type: 0}
+  faction: 8
+  tier: 7
+  weeklyGrowth: 1
+  maxHealth: 220
+  attack: 40
+  defense: 20
+  initiative: 10
+  speed: 5
+  minDamage: 1
+  maxDamage: 100
+  maxAmmo: 0
+  maxMana: 48
+  isRanged: 0
+  abilities:
+  - {fileID: 11400000, guid: 5882e9ef545f6544aaf70af9dc40ed78, type: 2}
+  - {fileID: 11400000, guid: 0f563f9641d52ab46a48552964e61016, type: 2}
+  customPowerMultiplier: 1
+  customPowerOffset: 0
