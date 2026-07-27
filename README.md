@@ -1,6 +1,10 @@
 # ⚔️ Heroes of Might & Magic 3D - Tactical RPG & Strategy Engine
 
+[![Playable Demo](https://img.shields.io/badge/Playable%20Demo-v1.0.0%20Prototype-brightgreen)](https://github.com/v33sergiulica/HoMM_V/releases)
+
 A feature-rich 3D Tactical Turn-Based RPG & Strategy Engine built in **Unity (C#)** inspired by classic *Heroes of Might and Magic (HOMM V)* mechanics.
+
+> 📦 **Playable Windows Prototype Available**: Download the latest build from the [GitHub Releases Page](https://github.com/v33sergiulica/HoMM_V/releases) to play the early prototype demo!
 
 Features a dual-layer gameplay loop: a **World Map Exploration & Economy Layer** and a **Grid-Based Tactical Combat System** powered by a custom **Minimax AI** and **Time-To-Act (ATB) Initiative Engine**.
 
