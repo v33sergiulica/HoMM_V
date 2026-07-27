@@ -58,29 +58,7 @@ namespace HommClone.World
                 CreateWorldUI();
             }
 
-            SpawnStarterMinesAndResourcesIfNoneExist();
             CheckPostBattleCleanup();
-        }
-
-        private void SpawnStarterMinesAndResourcesIfNoneExist()
-        {
-            var existingMines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
-            if (existingMines == null || existingMines.Length == 0)
-            {
-                CreateMine(ResourceType.Gold, 1000, new Vector2Int(5, 5));
-                CreateMine(ResourceType.Wood, 2, new Vector2Int(8, 2));
-                CreateMine(ResourceType.Ore, 2, new Vector2Int(2, 8));
-                CreateMine(ResourceType.Gems, 1, new Vector2Int(9, 9));
-            }
-
-            var existingPickables = FindObjectsByType<WorldResourcePickable>(FindObjectsSortMode.None);
-            if (existingPickables == null || existingPickables.Length == 0)
-            {
-                CreatePickable(ResourceType.Gold, 1000, new Vector2Int(3, 4));
-                CreatePickable(ResourceType.Wood, 10, new Vector2Int(6, 3));
-                CreatePickable(ResourceType.Ore, 10, new Vector2Int(4, 7));
-                CreatePickable(ResourceType.Gems, 3, new Vector2Int(7, 8));
-            }
         }
 
         private void CreateMine(ResourceType type, int income, Vector2Int pos)
@@ -232,8 +210,10 @@ namespace HommClone.World
             foreach (var monster in monsterStacks)
             {
                 if (monster == null || monster.Count <= 0) continue;
-                float dist = Vector2Int.Distance(targetTile, monster.GridPosition);
-                if (dist <= 1.5f)
+                int dx = Mathf.Abs(targetTile.x - monster.GridPosition.x);
+                int dy = Mathf.Abs(targetTile.y - monster.GridPosition.y);
+                // 8-neighbor adjacency (cardinal + diagonal <= 1)
+                if (dx <= 1 && dy <= 1)
                 {
                     guardingMonster = monster;
                     return true;
@@ -242,58 +222,115 @@ namespace HommClone.World
             return false;
         }
 
-        private void CheckTileEncounter(Vector2Int heroPos)
+        public bool IsEncounterTile(Vector2Int pos)
         {
-            // 1. Check direct monster encounters
+            // 1. Direct monster stack tile
             WorldMonsterStack[] monsters = FindObjectsByType<WorldMonsterStack>(FindObjectsSortMode.None);
             foreach (var m in monsters)
             {
-                if (m != null && m.Count > 0 && (m.GridPosition == heroPos || Vector2Int.Distance(m.GridPosition, heroPos) <= 1.1f))
+                if (m != null && m.Count > 0 && m.GridPosition == pos)
                 {
-                    TriggerBattleEncounter(m);
-                    return;
+                    return true;
                 }
             }
 
-            // 2. Check pickable resources
+            // 2. Guarded pickable resource
             WorldResourcePickable[] pickables = FindObjectsByType<WorldResourcePickable>(FindObjectsSortMode.None);
             foreach (var p in pickables)
             {
-                if (p != null && (p.GridPosition == heroPos || Vector2Int.Distance(p.GridPosition, heroPos) <= 0.8f))
+                if (p != null)
                 {
-                    if (CheckGuardedInteraction(p.GridPosition, out var guardMonster))
+                    int dx = Mathf.Abs(p.GridPosition.x - pos.x);
+                    int dy = Mathf.Abs(p.GridPosition.y - pos.y);
+                    if (dx <= 1 && dy <= 1 && CheckGuardedInteraction(p.GridPosition, out _))
                     {
-                        Debug.Log($"[WorldMapManager] Resource at {p.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
-                        TriggerBattleEncounter(guardMonster);
-                        return;
-                    }
-                    else
-                    {
-                        p.Collect(1);
-                        return;
+                        return true;
                     }
                 }
             }
 
-            // 3. Check mines / factories
+            // 3. Guarded mine / factory
             WorldMine[] mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
             foreach (var mine in mines)
             {
-                if (mine != null && (mine.GridPosition == heroPos || Vector2Int.Distance(mine.GridPosition, heroPos) <= 0.8f))
+                if (mine != null)
                 {
-                    if (CheckGuardedInteraction(mine.GridPosition, out var guardMonster))
+                    int dx = Mathf.Abs(mine.GridPosition.x - pos.x);
+                    int dy = Mathf.Abs(mine.GridPosition.y - pos.y);
+                    if (dx <= 1 && dy <= 1 && CheckGuardedInteraction(mine.GridPosition, out _))
                     {
-                        Debug.Log($"[WorldMapManager] Mine at {mine.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
-                        TriggerBattleEncounter(guardMonster);
-                        return;
-                    }
-                    else
-                    {
-                        mine.ClaimMine(1);
-                        return;
+                        return true;
                     }
                 }
             }
+
+            return false;
+        }
+
+        public bool CheckTileEncounter(Vector2Int heroPos)
+        {
+            // 1. Check direct monster stack encounters (Must step directly onto monster stack tile!)
+            WorldMonsterStack[] monsters = FindObjectsByType<WorldMonsterStack>(FindObjectsSortMode.None);
+            foreach (var m in monsters)
+            {
+                if (m != null && m.Count > 0 && m.GridPosition == heroPos)
+                {
+                    TriggerBattleEncounter(m);
+                    return true; // Battle triggered!
+                }
+            }
+
+            // 2. Check pickable resources (cardinal & diagonal 8-neighbor adjacency)
+            WorldResourcePickable[] pickables = FindObjectsByType<WorldResourcePickable>(FindObjectsSortMode.None);
+            foreach (var p in pickables)
+            {
+                if (p != null)
+                {
+                    int dx = Mathf.Abs(p.GridPosition.x - heroPos.x);
+                    int dy = Mathf.Abs(p.GridPosition.y - heroPos.y);
+                    if (dx <= 1 && dy <= 1) // On or adjacent
+                    {
+                        if (CheckGuardedInteraction(p.GridPosition, out var guardMonster))
+                        {
+                            Debug.Log($"[WorldMapManager] Resource at {p.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
+                            TriggerBattleEncounter(guardMonster);
+                            return true; // Battle triggered!
+                        }
+                        else if (heroPos == p.GridPosition)
+                        {
+                            p.Collect(1);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            // 3. Check mines / factories (cardinal & diagonal 8-neighbor adjacency)
+            WorldMine[] mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
+            foreach (var mine in mines)
+            {
+                if (mine != null)
+                {
+                    int dx = Mathf.Abs(mine.GridPosition.x - heroPos.x);
+                    int dy = Mathf.Abs(mine.GridPosition.y - heroPos.y);
+                    if (dx <= 1 && dy <= 1) // On or adjacent
+                    {
+                        if (CheckGuardedInteraction(mine.GridPosition, out var guardMonster))
+                        {
+                            Debug.Log($"[WorldMapManager] Mine at {mine.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
+                            TriggerBattleEncounter(guardMonster);
+                            return true; // Battle triggered!
+                        }
+                        else
+                        {
+                            mine.ClaimMine(1);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return false;
         }
 
         public void TriggerBattleEncounter(WorldMonsterStack monster)
@@ -338,15 +375,37 @@ namespace HommClone.World
             HeroData data = _activeHero != null ? _activeHero.Data : null;
             float remainingMP = data != null ? data.currentMovementPoints : 15f;
             float accumulatedCost = 0f;
+            bool encounterTriggeredInPath = false;
 
             for (int i = 1; i < path.Count; i++)
             {
-                WorldTile tile = _gridManager.GetTileAt(path[i]);
+                Vector2Int pos = path[i];
+                WorldTile tile = _gridManager.GetTileAt(pos);
                 if (tile != null)
                 {
                     accumulatedCost += tile.MovementCost;
                     bool inRange = accumulatedCost <= remainingMP;
-                    tile.HighlightAsPath(inRange);
+
+                    if (IsEncounterTile(pos))
+                    {
+                        encounterTriggeredInPath = true;
+                    }
+
+                    PathTileState state;
+                    if (!inRange)
+                    {
+                        state = PathTileState.OutOfRange; // Grey
+                    }
+                    else if (encounterTriggeredInPath)
+                    {
+                        state = PathTileState.ReachableCombat; // Red
+                    }
+                    else
+                    {
+                        state = PathTileState.ReachableSafe; // Green
+                    }
+
+                    tile.HighlightAsPath(state);
                 }
             }
         }

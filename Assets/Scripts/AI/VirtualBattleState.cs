@@ -214,6 +214,79 @@ namespace HommClone.AI
         }
 
         /// <summary>
+        /// Pure C# BFS calculating all reachable grid positions for a virtual stack.
+        /// Thread-safe for async Minimax background execution.
+        /// </summary>
+        public Dictionary<Vector2Int, int> GetReachableTiles(VirtualStackState stack)
+        {
+            Dictionary<Vector2Int, int> reachable = new Dictionary<Vector2Int, int>();
+            if (stack == null || stack.IsDead) return reachable;
+
+            int maxDist = stack.speed;
+
+            if (stack.isFlying)
+            {
+                // Flying unit logic: Manhattan distance
+                for (int x = 0; x < gridWidth; x++)
+                {
+                    for (int y = 0; y < gridHeight; y++)
+                    {
+                        Vector2Int pos = new Vector2Int(x, y);
+                        if (pos == stack.gridPosition) continue;
+                        int dist = Mathf.Abs(pos.x - stack.gridPosition.x) + Mathf.Abs(pos.y - stack.gridPosition.y);
+                        if (dist <= maxDist && CanOccupy(stack, pos))
+                        {
+                            reachable[pos] = dist;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Ground unit logic: 4 cardinal directions only
+                Queue<Vector2Int> queue = new Queue<Vector2Int>();
+                queue.Enqueue(stack.gridPosition);
+                reachable[stack.gridPosition] = 0;
+
+                Vector2Int[] cardinalDirs = new Vector2Int[]
+                {
+                    new Vector2Int(1, 0),
+                    new Vector2Int(-1, 0),
+                    new Vector2Int(0, 1),
+                    new Vector2Int(0, -1)
+                };
+
+                while (queue.Count > 0)
+                {
+                    Vector2Int current = queue.Dequeue();
+                    int currentCost = reachable[current];
+
+                    if (currentCost >= maxDist) continue;
+
+                    foreach (var dir in cardinalDirs)
+                    {
+                        Vector2Int nextPos = current + dir;
+
+                        if (nextPos.x >= 0 && nextPos.x < gridWidth && nextPos.y >= 0 && nextPos.y < gridHeight)
+                        {
+                            if (CanOccupy(stack, nextPos))
+                            {
+                                int newCost = currentCost + 1;
+                                if (!reachable.ContainsKey(nextPos) || newCost < reachable[nextPos])
+                                {
+                                    reachable[nextPos] = newCost;
+                                    queue.Enqueue(nextPos);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return reachable;
+        }
+
+        /// <summary>
         /// Heuristic evaluation function for the state:
         /// Normalized around 100 (AIPower / EnemyPower * 100) + Proportional KillShot & Shooter Block Bonuses.
         /// </summary>

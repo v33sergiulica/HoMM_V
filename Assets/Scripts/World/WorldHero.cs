@@ -151,6 +151,18 @@ namespace HommClone.World
                 transform.position = targetPos;
                 gridPosition = node;
                 if (data != null) data.worldPosition = node;
+
+                var mapManager = FindFirstObjectByType<WorldMapManager>();
+                if (mapManager != null && mapManager.CheckTileEncounter(node))
+                {
+                    Debug.Log($"[WorldHero] Battle encounter triggered at step {node}! Stopping hero movement immediately.");
+                    if (HommClone.Audio.AudioManager.Instance != null)
+                    {
+                        HommClone.Audio.AudioManager.Instance.StopMoveSound();
+                    }
+                    _isMoving = false;
+                    yield break;
+                }
             }
 
             if (HommClone.Audio.AudioManager.Instance != null)

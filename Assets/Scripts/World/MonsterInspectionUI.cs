@@ -201,52 +201,17 @@ namespace HommClone.World
             detailsRect.offsetMin = Vector2.zero;
             detailsRect.offsetMax = Vector2.zero;
 
-            // Attack Button
-            GameObject atkBtnObj = new GameObject("AttackBtn");
-            atkBtnObj.transform.SetParent(innerPanel.transform, false);
-            RectTransform atkRect = atkBtnObj.AddComponent<RectTransform>();
-            atkRect.anchorMin = new Vector2(0.1f, 0.05f);
-            atkRect.anchorMax = new Vector2(0.5f, 0.22f);
-            atkRect.offsetMin = Vector2.zero;
-            atkRect.offsetMax = Vector2.zero;
-
-            Image atkImg = atkBtnObj.AddComponent<Image>();
-            atkImg.color = new Color(0.65f, 0.15f, 0.15f, 1f);
-
-            _attackButton = atkBtnObj.AddComponent<Button>();
-            _attackButton.onClick.AddListener(() => {
-                HideWindow();
-                if (_inspectingMonster != null)
-                {
-                    var map = FindFirstObjectByType<WorldMapManager>();
-                    if (map != null) map.TriggerBattleEncounter(_inspectingMonster);
-                }
-            });
-
-            GameObject atkTxtObj = new GameObject("Text");
-            atkTxtObj.transform.SetParent(atkBtnObj.transform, false);
-            var atkTxt = atkTxtObj.AddComponent<TextMeshProUGUI>();
-            atkTxt.text = "<b>⚔️ ATTACK</b>";
-            atkTxt.alignment = TextAlignmentOptions.Center;
-            atkTxt.fontSize = 13;
-            atkTxt.color = Color.white;
-            RectTransform atkTxtRect = atkTxtObj.GetComponent<RectTransform>();
-            atkTxtRect.anchorMin = Vector2.zero;
-            atkTxtRect.anchorMax = Vector2.one;
-            atkTxtRect.offsetMin = Vector2.zero;
-            atkTxtRect.offsetMax = Vector2.zero;
-
             // Close Button
             GameObject closeBtnObj = new GameObject("CloseBtn");
             closeBtnObj.transform.SetParent(innerPanel.transform, false);
             RectTransform closeRect = closeBtnObj.AddComponent<RectTransform>();
-            closeRect.anchorMin = new Vector2(0.55f, 0.05f);
-            closeRect.anchorMax = new Vector2(0.9f, 0.22f);
+            closeRect.anchorMin = new Vector2(0.3f, 0.05f);
+            closeRect.anchorMax = new Vector2(0.7f, 0.22f);
             closeRect.offsetMin = Vector2.zero;
             closeRect.offsetMax = Vector2.zero;
 
             Image closeImg = closeBtnObj.AddComponent<Image>();
-            closeImg.color = new Color(0.3f, 0.3f, 0.35f, 1f);
+            closeImg.color = new Color(0.3f, 0.35f, 0.45f, 1f);
 
             Button closeBtn = closeBtnObj.AddComponent<Button>();
             closeBtn.onClick.AddListener(HideWindow);
@@ -258,11 +223,11 @@ namespace HommClone.World
             closeTxt.alignment = TextAlignmentOptions.Center;
             closeTxt.fontSize = 13;
             closeTxt.color = Color.white;
-            RectTransform closeTxtRect = closeTxtObj.GetComponent<RectTransform>();
-            closeTxtRect.anchorMin = Vector2.zero;
-            closeTxtRect.anchorMax = Vector2.one;
-            closeTxtRect.offsetMin = Vector2.zero;
-            closeTxtRect.offsetMax = Vector2.zero;
+            RectTransform cTxtRect = closeTxtObj.GetComponent<RectTransform>();
+            cTxtRect.anchorMin = Vector2.zero;
+            cTxtRect.anchorMax = Vector2.one;
+            cTxtRect.offsetMin = Vector2.zero;
+            cTxtRect.offsetMax = Vector2.zero;
         }
     }
 }

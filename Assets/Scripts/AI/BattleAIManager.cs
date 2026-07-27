@@ -154,7 +154,7 @@ namespace HommClone.AI
                 yield break;
             }
 
-            // --- MINIMAX SEARCH ENGINE INTEGRATION ---
+            // --- MINIMAX SEARCH ENGINE INTEGRATION (ASYNC NON-BLOCKING THREAD) ---
             if (useMinimax)
             {
                 VirtualBattleState initialState = BuildVirtualBattleState();
@@ -167,7 +167,33 @@ namespace HommClone.AI
                     weightRetaliationPenalty = this.weightRetaliationPenalty,
                     allowKitingWhenAttackAvailable = this.allowKitingWhenAttackAvailable
                 };
-                MinimaxAction bestMinimaxAction = MinimaxSearchEngine.FindBestAction(initialState, activeStack.GetInstanceID(), settings, _gridManager);
+
+                MinimaxAction bestMinimaxAction = null;
+                bool isMinimaxCompleted = false;
+                int activeStackId = activeStack.GetInstanceID();
+
+                // Launch Minimax calculation asynchronously on background thread to keep UI & Camera 60 FPS responsive!
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        bestMinimaxAction = MinimaxSearchEngine.FindBestAction(initialState, activeStackId, settings, null);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogError($"[AI Minimax Async Exception] {ex.Message}");
+                    }
+                    finally
+                    {
+                        isMinimaxCompleted = true;
+                    }
+                });
+
+                // Yield control to main Unity loop so player can pan camera, click UI & interact smoothly
+                while (!isMinimaxCompleted)
+                {
+                    yield return null;
+                }
 
                 if (bestMinimaxAction != null)
                 {

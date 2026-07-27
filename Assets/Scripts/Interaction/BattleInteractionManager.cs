@@ -387,6 +387,9 @@ namespace HommClone.Interaction
                 // 1. Hovering an ENEMY Stack -> Ranged Shot or Melee Attack Proximity Math
                 if (hitStack != null && hitStack.PlayerIndex != activeStack.PlayerIndex && !hitStack.IsDead && !hitStack.IsHero)
                 {
+                    // Draw enemy's movement range in soft faded slate grey for tactical calculation!
+                    HighlightEnemyReachableRange(hitStack);
+
                     bool forceMelee = Keyboard.current != null && Keyboard.current.shiftKey.isPressed;
 
                     if (activeStack.CanShoot() && !forceMelee)
@@ -731,6 +734,21 @@ namespace HommClone.Interaction
                     {
                         activeTile.SetColor(Color.green);
                     }
+                }
+            }
+        }
+
+        private void HighlightEnemyReachableRange(CreatureStack enemy)
+        {
+            if (enemy == null || enemy.IsDead || _gridManager == null) return;
+            var enemyReachable = _gridManager.GetReachableTiles(enemy.GridPosition, enemy.Speed, enemy.Data.IsFlying, enemy.IsLarge);
+            Color fadedGrey = new Color(0.45f, 0.45f, 0.52f, 0.6f); // Soft slate grey
+            foreach (var pos in enemyReachable.Keys)
+            {
+                Tile tile = _gridManager.GetTileAt(pos);
+                if (tile != null && !_reachableTiles.ContainsKey(pos))
+                {
+                    tile.SetColor(fadedGrey);
                 }
             }
         }

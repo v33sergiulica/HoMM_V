@@ -49,51 +49,68 @@ namespace HommClone.AI
             VirtualStackState activeStack = initialState.GetStackById(activeStackId);
             if (activeStack == null || activeStack.IsDead) return null;
 
-            MinimaxAction bestOverallAction = null;
-            int maxDepthCompleted = 0;
+            List<MinimaxAction> candidates = GenerateCandidateActions(initialState, activeStack, gridManager, settings);
+            if (candidates == null || candidates.Count == 0) return null;
 
-            // Iterative Deepening: Search 1-ply, 2-ply, 3-ply... up to 6-ply within time budget
+            MinimaxAction bestAction = candidates[0];
+            int maxDepthReached = 1;
+
+            // Iterative Deepening
             for (int depth = 1; depth <= 6; depth++)
             {
                 if (stopwatch.ElapsedMilliseconds >= timeBudgetMs) break;
 
-                MinimaxAction depthAction = SearchDepth(initialState, activeStackId, depth, float.NegativeInfinity, float.PositiveInfinity, true, activeStack.playerIndex, stopwatch, timeBudgetMs, gridManager, settings);
-                
-                // If search was interrupted midway due to time limit, drop incomplete depth result
-                if (stopwatch.ElapsedMilliseconds < timeBudgetMs && depthAction != null)
+                MinimaxAction bestDepthAction = null;
+                float maxDepthScore = float.NegativeInfinity;
+
+                foreach (var cand in candidates)
                 {
-                    bestOverallAction = depthAction;
-                    maxDepthCompleted = depth;
+                    if (stopwatch.ElapsedMilliseconds >= timeBudgetMs) break;
+
+                    VirtualBattleState simState = initialState.Clone();
+                    ApplyActionToVirtualState(simState, cand);
+
+                    VirtualStackState nextUnit = FindNextParticipant(simState, activeStackId, activeStack.playerIndex, false);
+                    float evalScore;
+
+                    if (nextUnit != null && depth > 1)
+                    {
+                        MinimaxAction res = SearchDepth(simState, nextUnit.id, depth - 1, float.NegativeInfinity, float.PositiveInfinity, false, activeStack.playerIndex, stopwatch, timeBudgetMs, gridManager, settings);
+                        evalScore = res != null ? res.score : simState.Evaluate(activeStack.playerIndex, settings);
+                    }
+                    else
+                    {
+                        evalScore = simState.Evaluate(activeStack.playerIndex, settings);
+                    }
+
+                    evalScore += CalculateActionBonus(initialState, cand, settings);
+                    cand.score = evalScore;
+
+                    if (evalScore > maxDepthScore)
+                    {
+                        maxDepthScore = evalScore;
+                        bestDepthAction = cand;
+                    }
+                }
+
+                if (stopwatch.ElapsedMilliseconds < timeBudgetMs && bestDepthAction != null)
+                {
+                    bestAction = bestDepthAction;
+                    maxDepthReached = depth;
                 }
             }
 
             stopwatch.Stop();
 
-            // Detailed Debug Logging of Top Candidate Actions with exact Minimax scores
-            List<MinimaxAction> topCandidates = GenerateCandidateActions(initialState, activeStack, gridManager, settings);
-            string debugMsg = $"<b>[Minimax AI Engine]</b> Unit: <b>{activeStack.name}</b> | Depth Reached: <b>{maxDepthCompleted}</b> ({stopwatch.ElapsedMilliseconds} ms)\n";
+            // Sort candidates by evaluated score descending for crystal-clear readability
+            candidates.Sort((a, b) => b.score.CompareTo(a.score));
+
+            // Detailed Debug Logging of Candidates with exact scores
+            string debugMsg = $"<b>[Minimax AI Engine]</b> Unit: <b>{activeStack.name}</b> | Depth Reached: <b>{maxDepthReached}</b> ({stopwatch.ElapsedMilliseconds} ms)\n";
             debugMsg += "<b>Evaluated Candidate Actions:</b>\n";
 
-            foreach (var cand in topCandidates)
+            foreach (var cand in candidates)
             {
-                VirtualBattleState simState = initialState.Clone();
-                ApplyActionToVirtualState(simState, cand);
-
-                // Run SearchDepth for this candidate to get its true tree score
-                VirtualStackState nextUnit = FindNextParticipant(simState, activeStackId, activeStack.playerIndex, false);
-                float evalScore;
-                if (nextUnit != null && maxDepthCompleted > 1)
-                {
-                    MinimaxAction res = SearchDepth(simState, nextUnit.id, maxDepthCompleted - 1, float.NegativeInfinity, float.PositiveInfinity, false, activeStack.playerIndex, stopwatch, timeBudgetMs, gridManager, settings);
-                    evalScore = res != null ? res.score : simState.Evaluate(activeStack.playerIndex, settings);
-                }
-                else
-                {
-                    evalScore = simState.Evaluate(activeStack.playerIndex, settings);
-                }
-
-                evalScore += CalculateActionBonus(initialState, cand, settings);
-
                 string targetName = "None";
                 if (cand.targetStackId != 0)
                 {
@@ -101,28 +118,14 @@ namespace HommClone.AI
                     if (tStack != null) targetName = tStack.name;
                 }
 
-                string isChosen = (bestOverallAction != null && cand.actionType == bestOverallAction.actionType && cand.destinationTile == bestOverallAction.destinationTile && cand.targetStackId == bestOverallAction.targetStackId) ? " <color=yellow>★ SELECTED ★</color>" : "";
-
-                debugMsg += $"- <b>{cand.actionType}</b> | Target: {targetName} | Tile: {cand.destinationTile} | Score: <b>{evalScore:F1}</b>{isChosen}\n";
+                string isChosen = (cand == bestAction) ? " <color=yellow>★ SELECTED ★</color>" : "";
+                debugMsg += $"- <b>{cand.actionType}</b> | Target: {targetName} | Tile: {cand.destinationTile} | Score: <b>{cand.score:F1}</b>{isChosen}\n";
             }
 
             UnityEngine.Debug.Log(debugMsg);
 
-            if (bestOverallAction != null)
-            {
-                bestOverallAction.searchDepthReached = maxDepthCompleted;
-            }
-            else
-            {
-                // Fallback to simple immediate candidate action if depth 1 was cut short
-                if (topCandidates.Count > 0)
-                {
-                    bestOverallAction = topCandidates[0];
-                    bestOverallAction.searchDepthReached = 1;
-                }
-            }
-
-            return bestOverallAction;
+            bestAction.searchDepthReached = maxDepthReached;
+            return bestAction;
         }
 
         private static MinimaxAction SearchDepth(VirtualBattleState state, int activeStackId, int depth, float alpha, float beta, bool isMaximizing, int aiPlayerIndex, Stopwatch stopwatch, long timeBudgetMs, Grid.GridManager gridManager, MinimaxSettings settings)
@@ -233,6 +236,12 @@ namespace HommClone.AI
         {
             if (action == null || settings == null) return 0f;
             float bonus = 0f;
+
+            VirtualStackState active = state.GetStackById(action.activeStackId);
+            if (active == null) return 0f;
+
+            int enemyPlayerIndex = (active.playerIndex == 1) ? 2 : 1;
+
             if (action.actionType == MinimaxActionType.MeleeAttack || action.actionType == MinimaxActionType.RangedAttack)
             {
                 bonus += settings.directAttackBonus;
@@ -246,6 +255,44 @@ namespace HommClone.AI
                     }
                 }
             }
+            else if (action.actionType == MinimaxActionType.Defend)
+            {
+                // Tactical rule: Check if AI has shooters vs Enemy has shooters
+                bool aiHasShooters = state.stacks.Exists(s => s != null && !s.IsDead && s.playerIndex == active.playerIndex && s.isRanged && s.currentAmmo > 0);
+                bool enemyHasShooters = state.stacks.Exists(s => s != null && !s.IsDead && s.playerIndex == enemyPlayerIndex && s.isRanged && s.currentAmmo > 0);
+
+                if (!aiHasShooters && enemyHasShooters)
+                {
+                    // Heavy penalty for standing still defending against ranged shooters!
+                    bonus -= 250f;
+                }
+                else
+                {
+                    // General penalty for defending over advancing
+                    bonus -= 45f;
+                }
+            }
+            else if (action.actionType == MinimaxActionType.MoveOnly)
+            {
+                VirtualStackState targetEnemy = state.stacks.Find(s => s != null && !s.IsDead && s.playerIndex == enemyPlayerIndex);
+                if (targetEnemy != null)
+                {
+                    float distBefore = Vector2Int.Distance(active.gridPosition, targetEnemy.gridPosition);
+                    float distAfter = Vector2Int.Distance(action.destinationTile, targetEnemy.gridPosition);
+                    if (distAfter < distBefore)
+                    {
+                        bonus += (distBefore - distAfter) * 15f; // Reward advancing towards target enemy
+                    }
+                }
+
+                // Threat evaluation: soft penalty if tile is in enemy attack range
+                HashSet<Vector2Int> threatMap = state.CalculateEnemyThreatMap(active.playerIndex);
+                if (threatMap != null && threatMap.Contains(action.destinationTile))
+                {
+                    bonus -= 8f; // Soft penalty for exposed threat zone
+                }
+            }
+
             return bonus;
         }
 
@@ -361,6 +408,16 @@ namespace HommClone.AI
             {
                 reachableTiles = gridManager.GetReachableTiles(activeStack.gridPosition, activeStack.speed, activeStack.isFlying, activeStack.isLarge);
             }
+            else if (state != null)
+            {
+                // Pure C# Virtual Grid Reachability fallback when running on background async thread!
+                var vReachable = state.GetReachableTiles(activeStack);
+                reachableTiles = new Dictionary<Vector2Int, List<Vector2Int>>();
+                foreach (var kvp in vReachable)
+                {
+                    reachableTiles[kvp.Key] = new List<Vector2Int>();
+                }
+            }
 
             // 1. Ranged Attack Options (if shooter, has ammo, and NOT blocked by adjacent enemies)
             if (activeStack.isRanged && activeStack.currentAmmo > 0 && !IsBlocked(state, activeStack))
@@ -450,12 +507,18 @@ namespace HommClone.AI
 
                 if (targetEnemy != null && reachableTiles != null)
                 {
+                    float currentDist = Vector2Int.Distance(activeStack.gridPosition, targetEnemy.gridPosition);
+
                     foreach (var candidateTile in reachableTiles.Keys)
                     {
+                        if (candidateTile == activeStack.gridPosition) continue;
+
                         bool canOccupy = state.CanOccupy(activeStack, candidateTile);
-                        if (canOccupy && !threatMap.Contains(candidateTile))
+                        if (canOccupy)
                         {
-                            if (Vector2Int.Distance(candidateTile, targetEnemy.gridPosition) < minDist)
+                            float dist = Vector2Int.Distance(candidateTile, targetEnemy.gridPosition);
+                            // Add candidate tiles that advance towards target enemy
+                            if (dist < currentDist)
                             {
                                 candidates.Add(new MinimaxAction
                                 {

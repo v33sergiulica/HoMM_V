@@ -125,7 +125,8 @@ namespace HommClone.World
             GameObject pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pole.name = "FlagPole";
             pole.transform.SetParent(transform, false);
-            pole.transform.localPosition = new Vector3(0.35f, 0.9f, 0.35f);
+            pole.transform.localPosition = new Vector3(0.3f, 0.5f, 0.3f);
+            pole.transform.localScale = new Vector3(0.04f, 0.2f, 0.04f);
             var pRen = pole.GetComponent<Renderer>();
             if (pRen != null) MaterialUtils.SetRendererColor(pRen, new Color(0.4f, 0.4f, 0.4f));
 
@@ -133,8 +134,8 @@ namespace HommClone.World
             GameObject flag = GameObject.CreatePrimitive(PrimitiveType.Cube);
             flag.name = "FlagTop";
             flag.transform.SetParent(pole.transform, false);
-            flag.transform.localPosition = new Vector3(0f, 0.6f, 0.3f);
-            flag.transform.localScale = new Vector3(0.1f, 0.4f, 0.6f);
+            flag.transform.localPosition = new Vector3(0f, 0.7f, 0.2f);
+            flag.transform.localScale = new Vector3(0.1f, 0.25f, 0.4f);
 
             flagRenderer = flag.GetComponent<Renderer>();
             UpdateFlagColor();

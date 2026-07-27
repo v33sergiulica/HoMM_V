@@ -21,6 +21,13 @@ namespace HommClone.World
         EnemyStack
     }
 
+    public enum PathTileState
+    {
+        ReachableSafe,    // Green: Within MP, no combat
+        ReachableCombat,  // Red: Within MP, but requires/triggers battle encounter
+        OutOfRange        // Grey: Beyond remaining MP
+    }
+
     /// <summary>
     /// Represents a single tile node on the World Map grid.
     /// Manages terrain type, movement cost, path highlights, and world objects.
@@ -33,7 +40,6 @@ namespace HommClone.World
         [SerializeField] private WorldObjectType objectType = WorldObjectType.None;
 
         private Renderer _tileRenderer;
-        private MaterialPropertyBlock _propBlock;
         private Color _baseColor;
 
         public Vector2Int GridPosition => gridPosition;
@@ -108,11 +114,28 @@ namespace HommClone.World
             SetTileColor(_baseColor);
         }
 
-        public void HighlightAsPath(bool inRange)
+        public void HighlightAsPath(PathTileState state)
         {
             if (!IsPassable) return;
-            Color pathColor = inRange ? new Color(0.2f, 0.9f, 0.2f, 1f) : new Color(0.9f, 0.2f, 0.2f, 1f);
-            SetTileColor(pathColor);
+            Color pathColor = Color.green;
+            switch (state)
+            {
+                case PathTileState.ReachableSafe:
+                    pathColor = new Color(0.2f, 0.9f, 0.2f, 1f); // Bright Green
+                    break;
+                case PathTileState.ReachableCombat:
+                    pathColor = new Color(0.95f, 0.2f, 0.2f, 1f); // Crimson Red
+                    break;
+                case PathTileState.OutOfRange:
+                    pathColor = new Color(0.55f, 0.55f, 0.6f, 1f); // Neutral Slate Grey
+                    break;
+            }
+            MaterialUtils.SetRendererColor(_tileRenderer, pathColor);
+        }
+
+        public void HighlightAsPath(bool inRange)
+        {
+            HighlightAsPath(inRange ? PathTileState.ReachableSafe : PathTileState.OutOfRange);
         }
 
         public void HighlightHover(bool isValid)
@@ -132,22 +155,7 @@ namespace HommClone.World
             EnsureComponents();
             if (_tileRenderer != null)
             {
-                Material mat = Application.isPlaying ? _tileRenderer.material : _tileRenderer.sharedMaterial;
-                if (mat != null)
-                {
-                    if (mat.HasProperty("_BaseColor"))
-                    {
-                        mat.SetColor("_BaseColor", color);
-                    }
-                    else if (mat.HasProperty("_Color"))
-                    {
-                        mat.SetColor("_Color", color);
-                    }
-                    else
-                    {
-                        mat.color = color;
-                    }
-                }
+                MaterialUtils.SetRendererColor(_tileRenderer, color);
             }
         }
     }
