@@ -141,6 +141,12 @@ namespace HommClone.World
 
         private void Update()
         {
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                QuitGame();
+                return;
+            }
+
             if (_gridManager == null) _gridManager = FindFirstObjectByType<WorldGridManager>();
             if (_activeHero == null) _activeHero = FindFirstObjectByType<WorldHero>();
 
@@ -443,6 +449,16 @@ namespace HommClone.World
                 UpdateUI();
                 Debug.Log($"[WorldMapManager] End Turn: Advanced to Month {manager.currentMonth}, Week {manager.currentWeek}, Day {manager.currentDay}. Daily mine resources collected.");
             }
+        }
+
+        public void QuitGame()
+        {
+            Debug.Log("[WorldMapManager] Quitting application...");
+            #if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+            #else
+            Application.Quit();
+            #endif
         }
 
         private void CreateWorldUI()

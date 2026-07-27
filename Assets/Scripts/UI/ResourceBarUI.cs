@@ -132,6 +132,38 @@ namespace HommClone.UI
             _oreText = CreateResourceLabel(layoutObj, "OreText");
             _gemsText = CreateResourceLabel(layoutObj, "GemsText");
             _dayText = CreateResourceLabel(layoutObj, "DayText");
+
+            // Quit / Exit Game Button
+            GameObject quitObj = new GameObject("QuitButton");
+            quitObj.transform.SetParent(layoutObj.transform, false);
+            Image qImg = quitObj.AddComponent<Image>();
+            qImg.color = new Color(0.8f, 0.2f, 0.2f, 0.9f);
+            Button qBtn = quitObj.AddComponent<Button>();
+            qBtn.onClick.AddListener(() => {
+                var mapManager = FindFirstObjectByType<WorldMapManager>();
+                if (mapManager != null) mapManager.QuitGame();
+                else
+                {
+                    #if UNITY_EDITOR
+                    UnityEditor.EditorApplication.isPlaying = false;
+                    #else
+                    Application.Quit();
+                    #endif
+                }
+            });
+
+            GameObject qTextObj = new GameObject("QuitText");
+            qTextObj.transform.SetParent(quitObj.transform, false);
+            RectTransform qtRect = qTextObj.AddComponent<RectTransform>();
+            qtRect.anchorMin = Vector2.zero;
+            qtRect.anchorMax = Vector2.one;
+            qtRect.offsetMin = Vector2.zero;
+            qtRect.offsetMax = Vector2.zero;
+            var qTxt = qTextObj.AddComponent<TextMeshProUGUI>();
+            qTxt.text = "<b>EXIT GAME (ESC)</b>";
+            qTxt.fontSize = 11;
+            qTxt.color = Color.white;
+            qTxt.alignment = TextAlignmentOptions.Center;
         }
 
         private TextMeshProUGUI CreateResourceLabel(GameObject parent, string name)
