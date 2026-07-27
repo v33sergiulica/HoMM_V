@@ -136,8 +136,7 @@ namespace HommClone.Heroes
             var pedRen = pedestal.GetComponent<Renderer>();
             if (pedRen != null)
             {
-                pedRen.material = new Material(Shader.Find("Standard") ?? Shader.Find("Sprites/Default"));
-                pedRen.material.color = faceRight ? new Color(0.85f, 0.7f, 0.2f) : new Color(0.75f, 0.2f, 0.2f); // Gold for P1, Red for P2
+                World.MaterialUtils.SetRendererColor(pedRen, faceRight ? new Color(0.85f, 0.7f, 0.2f) : new Color(0.75f, 0.2f, 0.2f));
             }
 
             // Hero Figure Capsule Body
@@ -150,8 +149,7 @@ namespace HommClone.Heroes
             var bodyRen = body.GetComponent<Renderer>();
             if (bodyRen != null)
             {
-                bodyRen.material = new Material(Shader.Find("Standard") ?? Shader.Find("Sprites/Default"));
-                bodyRen.material.color = faceRight ? new Color(0.2f, 0.5f, 0.9f) : new Color(0.8f, 0.3f, 0.3f);
+                World.MaterialUtils.SetRendererColor(bodyRen, faceRight ? new Color(0.2f, 0.5f, 0.9f) : new Color(0.8f, 0.3f, 0.3f));
             }
 
             // Hero Crown / Helm
@@ -164,8 +162,7 @@ namespace HommClone.Heroes
             var helmRen = helm.GetComponent<Renderer>();
             if (helmRen != null)
             {
-                helmRen.material = new Material(Shader.Find("Standard") ?? Shader.Find("Sprites/Default"));
-                helmRen.material.color = Color.gold;
+                World.MaterialUtils.SetRendererColor(helmRen, Color.gold);
             }
         }
     }

@@ -158,7 +158,7 @@ namespace HommClone.Creatures
             var baseRenderer = baseObj.GetComponent<MeshRenderer>();
             if (baseRenderer != null)
             {
-                baseRenderer.material.color = teamColor;
+                MaterialUtils.SetRendererColor(baseRenderer, teamColor);
             }
 
             // Remove old visual child if it exists
@@ -290,7 +290,7 @@ namespace HommClone.Creatures
                 var renderer = visualObj.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
-                    renderer.material.color = factionColor;
+                    MaterialUtils.SetRendererColor(renderer, factionColor);
                 }
             }
 

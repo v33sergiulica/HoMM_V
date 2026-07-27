@@ -75,15 +75,8 @@ namespace HommClone.World
                 Renderer r = body.GetComponent<Renderer>();
                 if (r != null)
                 {
-                    Shader defaultShader = Shader.Find("Universal Render Pipeline/Lit");
-                    if (defaultShader == null) defaultShader = Shader.Find("Standard");
-                    if (defaultShader == null) defaultShader = Shader.Find("Unlit/Color");
-
-                    r.material = new Material(defaultShader);
                     Color monsterColor = new Color(0.9f, 0.15f, 0.15f, 1f); // Crimson enemy red
-
-                    if (r.material.HasProperty("_BaseColor")) r.material.SetColor("_BaseColor", monsterColor);
-                    else r.material.color = monsterColor;
+                    MaterialUtils.SetRendererColor(r, monsterColor);
                 }
             }
         }

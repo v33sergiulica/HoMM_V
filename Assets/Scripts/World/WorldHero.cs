@@ -80,15 +80,8 @@ namespace HommClone.World
                 Renderer r = body.GetComponent<Renderer>();
                 if (r != null)
                 {
-                    Shader defaultShader = Shader.Find("Universal Render Pipeline/Lit");
-                    if (defaultShader == null) defaultShader = Shader.Find("Standard");
-                    if (defaultShader == null) defaultShader = Shader.Find("Unlit/Color");
-
-                    r.material = new Material(defaultShader);
                     Color heroColor = playerIndex == 1 ? new Color(0.2f, 0.5f, 0.95f) : new Color(0.95f, 0.2f, 0.2f);
-
-                    if (r.material.HasProperty("_BaseColor")) r.material.SetColor("_BaseColor", heroColor);
-                    else r.material.color = heroColor;
+                    MaterialUtils.SetRendererColor(r, heroColor);
                 }
             }
         }

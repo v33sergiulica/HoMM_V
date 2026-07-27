@@ -92,7 +92,7 @@ namespace HommClone.World
             }
 
             var ren = pile.GetComponent<Renderer>();
-            if (ren != null) ren.material.color = rColor;
+            if (ren != null) MaterialUtils.SetRendererColor(ren, rColor);
         }
     }
 }

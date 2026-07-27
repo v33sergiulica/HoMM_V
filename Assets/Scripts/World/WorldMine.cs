@@ -83,7 +83,7 @@ namespace HommClone.World
                 if (ownerPlayerIndex == 1) c = new Color(0.1f, 0.5f, 0.95f); // Player 1 Blue
                 else if (ownerPlayerIndex == 2) c = new Color(0.95f, 0.2f, 0.2f); // Player 2 Red
 
-                flagRenderer.material.color = c;
+                MaterialUtils.SetRendererColor(flagRenderer, c);
             }
         }
 
@@ -119,7 +119,7 @@ namespace HommClone.World
             }
 
             var bRen = building.GetComponent<Renderer>();
-            if (bRen != null) bRen.material.color = bColor;
+            if (bRen != null) MaterialUtils.SetRendererColor(bRen, bColor);
 
             // Flag Pole
             GameObject pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);

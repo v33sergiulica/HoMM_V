@@ -77,16 +77,7 @@ namespace HommClone.World
                         Renderer r = tileObj.GetComponent<Renderer>();
                         if (r != null)
                         {
-                            Shader defaultShader = Shader.Find("Universal Render Pipeline/Lit");
-                            if (defaultShader == null) defaultShader = Shader.Find("Universal Render Pipeline/Simple Lit");
-                            if (defaultShader == null) defaultShader = Shader.Find("Standard");
-                            if (defaultShader == null) defaultShader = Shader.Find("Unlit/Color");
-                            if (defaultShader == null) defaultShader = Shader.Find("Sprites/Default");
-
-                            if (defaultShader != null)
-                            {
-                                r.material = new Material(defaultShader);
-                            }
+                            MaterialUtils.SetRendererColor(r, Color.white);
                         }
                     }
 
