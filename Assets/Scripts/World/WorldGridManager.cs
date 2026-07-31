@@ -209,7 +209,15 @@ namespace HommClone.World
                     WorldTile nTile = GetTileAt(neighborPos);
                     if (nTile == null || !nTile.IsPassable || closedSet.ContainsKey(neighborPos)) continue;
 
-                    float stepCost = nTile.MovementCost;
+                    float baseCost = nTile.MovementCost;
+                    float stepCost = baseCost;
+
+                    var activeHeroData = GameDataManager.GetOrCreateInstance().GetActiveHero();
+                    if (activeHeroData != null && baseCost > 1.0f)
+                    {
+                        float discount = activeHeroData.GetPathfindingDiscount();
+                        stepCost = 1.0f + (baseCost - 1.0f) * (1.0f - discount);
+                    }
 
                     // Add high movement penalty for battle encounter tiles unless it is the final target destination
                     if (neighborPos != target)

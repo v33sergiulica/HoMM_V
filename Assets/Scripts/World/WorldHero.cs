@@ -109,18 +109,31 @@ namespace HommClone.World
             body.transform.localScale = new Vector3(0.6f, 0.6f, 0.6f);
             body.transform.localPosition = new Vector3(0f, 0.3f, 0f);
 
-            var primCollider = body.GetComponent<Collider>();
-            if (primCollider != null)
+            // Ensure root GameObject has a Collider for Raycasting!
+            CapsuleCollider col = GetComponent<CapsuleCollider>();
+            if (col == null)
             {
-                if (Application.isPlaying) Destroy(primCollider);
-                else DestroyImmediate(primCollider);
+                col = gameObject.AddComponent<CapsuleCollider>();
             }
+            col.center = new Vector3(0f, 0.8f, 0f);
+            col.radius = 0.5f;
+            col.height = 1.6f;
 
             Renderer r = body.GetComponent<Renderer>();
             if (r != null)
             {
                 Color heroColor = playerIndex == 1 ? new Color(0.2f, 0.5f, 0.95f) : new Color(0.95f, 0.2f, 0.2f);
                 MaterialUtils.SetRendererColor(r, heroColor);
+            }
+        }
+
+        private bool _stopMovementRequested = false;
+
+        public void StopMovement()
+        {
+            if (_isMoving)
+            {
+                _stopMovementRequested = true;
             }
         }
 
@@ -135,6 +148,7 @@ namespace HommClone.World
             }
 
             _isMoving = true;
+            _stopMovementRequested = false;
             HeroData data = Data;
 
             if (HommClone.Audio.AudioManager.Instance != null)
@@ -200,6 +214,16 @@ namespace HommClone.World
                     }
                     _isMoving = false;
                     yield break;
+                }
+
+                if (_stopMovementRequested)
+                {
+                    Debug.Log($"[WorldHero] Movement safely interrupted by player at tile {node}.");
+                    if (HommClone.Audio.AudioManager.Instance != null)
+                    {
+                        HommClone.Audio.AudioManager.Instance.StopMoveSound();
+                    }
+                    break;
                 }
             }
 

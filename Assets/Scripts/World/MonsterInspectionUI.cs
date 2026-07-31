@@ -70,6 +70,19 @@ namespace HommClone.World
             }
         }
 
+        public static string GetVagueDescriptor(int count)
+        {
+            if (count <= 4) return "Few (1-4)";
+            if (count <= 9) return "Several (5-9)";
+            if (count <= 19) return "Pack (10-19)";
+            if (count <= 49) return "Lots (20-49)";
+            if (count <= 99) return "Horde (50-99)";
+            if (count <= 249) return "Throng (100-249)";
+            if (count <= 499) return "Swarm (250-499)";
+            if (count <= 999) return "Zounds (500-999)";
+            return "Legion (1000+)";
+        }
+
         private void RefreshData(WorldMonsterStack monster)
         {
             _inspectingMonster = monster;
@@ -77,10 +90,14 @@ namespace HommClone.World
 
             string cName = monster.CreatureData != null ? monster.CreatureData.CreatureName : "Monster Stack";
             int count = monster.Count;
+            var activeHero = GameDataManager.GetOrCreateInstance().GetActiveHero();
+            bool hasScouting = activeHero != null && activeHero.HasScouting();
+
+            string countDisplay = hasScouting ? $"{count}x" : GetVagueDescriptor(count);
 
             if (_monsterTitleText != null)
             {
-                _monsterTitleText.text = $"<b>{count}x {cName}</b>";
+                _monsterTitleText.text = $"<b>{countDisplay} {cName}</b>";
             }
 
             if (_monsterIconImage != null)

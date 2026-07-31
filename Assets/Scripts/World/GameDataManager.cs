@@ -59,6 +59,39 @@ namespace HommClone.World
         public List<ArmySlot> army = new List<ArmySlot>();
         public List<HommClone.Heroes.SecondarySkillSlot> secondarySkills = new List<HommClone.Heroes.SecondarySkillSlot>();
 
+        public int adventureSkillTokens = 1; // Starts with 1 token for initial customization!
+        public List<string> unlockedAdventureSkills = new List<string>();
+
+        public float GetLogisticsBonus()
+        {
+            if (unlockedAdventureSkills.Contains("logistics_3")) return 0.30f;
+            if (unlockedAdventureSkills.Contains("logistics_2")) return 0.20f;
+            if (unlockedAdventureSkills.Contains("logistics_1")) return 0.10f;
+            return 0f;
+        }
+
+        public float GetPathfindingDiscount()
+        {
+            if (unlockedAdventureSkills.Contains("pathfinding_2")) return 1.0f; // -100% terrain penalty
+            if (unlockedAdventureSkills.Contains("pathfinding_1")) return 0.5f; // -50% terrain penalty
+            return 0f;
+        }
+
+        public bool HasScouting()
+        {
+            return unlockedAdventureSkills.Contains("scouting");
+        }
+
+        public bool HasStealth()
+        {
+            return unlockedAdventureSkills.Contains("stealth");
+        }
+
+        public float GetEffectiveMaxMovementPoints()
+        {
+            return maxMovementPoints * (1f + GetLogisticsBonus());
+        }
+
         public int GetXPForNextLevel(int lvl)
         {
             return Mathf.RoundToInt(1000f * Mathf.Pow(1.25f, lvl - 1));
@@ -78,6 +111,7 @@ namespace HommClone.World
                 level++;
                 xpToNextLevel = GetXPForNextLevel(level);
                 leveledUp = true;
+                adventureSkillTokens++; // Grant 1 Adventure Skill Token per level up!
 
                 string currentLevelStat = "";
                 // Increase a primary stat randomly biased towards knight / warrior (Attack / Defense)
@@ -162,16 +196,18 @@ namespace HommClone.World
             {
                 if (mine == null || mine.OwnerPlayerIndex == 0) continue;
                 PlayerResources targetRes = (mine.OwnerPlayerIndex == 1) ? player1Resources : player2Resources;
+
                 if (targetRes != null)
                 {
+                    int finalIncome = mine.Income;
                     switch (mine.Type)
                     {
-                        case ResourceType.Gold: targetRes.gold += mine.Income; break;
-                        case ResourceType.Wood: targetRes.wood += mine.Income; break;
-                        case ResourceType.Ore: targetRes.ore += mine.Income; break;
-                        case ResourceType.Gems: targetRes.gems += mine.Income; break;
+                        case ResourceType.Gold: targetRes.gold += finalIncome; break;
+                        case ResourceType.Wood: targetRes.wood += finalIncome; break;
+                        case ResourceType.Ore: targetRes.ore += finalIncome; break;
+                        case ResourceType.Gems: targetRes.gems += finalIncome; break;
                     }
-                    Debug.Log($"[GameDataManager] Daily Income: Player {mine.OwnerPlayerIndex} received +{mine.Income} {mine.Type} from mine at {mine.GridPosition}!");
+                    Debug.Log($"[GameDataManager] Daily Income: Player {mine.OwnerPlayerIndex} received +{finalIncome} {mine.Type} from mine at {mine.GridPosition}!");
                 }
             }
         }
@@ -219,12 +255,21 @@ namespace HommClone.World
 
         public void InitializeStarterArmies(List<CreatureData> availableCreatures = null)
         {
+            if (player1Hero == null) player1Hero = new HeroData();
+            if (player2Hero == null) player2Hero = new HeroData();
+
+            player1Hero.heroName = "Player 1 Hero";
+            player2Hero.heroName = "Player 2 Hero";
+
             if (player1Hero.army == null) player1Hero.army = new List<ArmySlot>();
+            if (player2Hero.army == null) player2Hero.army = new List<ArmySlot>();
+
+            if (player1Hero.unlockedAdventureSkills == null) player1Hero.unlockedAdventureSkills = new List<string>();
+            if (player2Hero.unlockedAdventureSkills == null) player2Hero.unlockedAdventureSkills = new List<string>();
 
             // Only initialize default army if army list is completely empty
             if (player1Hero.army.Count == 0)
             {
-
                 if (availableCreatures == null || availableCreatures.Count == 0)
                 {
                     availableCreatures = new List<CreatureData>(Resources.FindObjectsOfTypeAll<CreatureData>());
@@ -258,6 +303,12 @@ namespace HommClone.World
                         player1Hero.army.Add(new ArmySlot(tier2Data, 100));
                     }
                 }
+            }
+
+            if (player2Hero.army.Count == 0 && availableCreatures != null && availableCreatures.Count > 0)
+            {
+                CreatureData t1 = availableCreatures[0];
+                player2Hero.army.Add(new ArmySlot(t1, 150));
             }
         }
 

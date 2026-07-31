@@ -23,6 +23,7 @@ namespace HommClone.World
         private TextMeshProUGUI _statsText;
         private TextMeshProUGUI _mpText;
         private Image _mpBarFill;
+        private GameObject _skillTreeBtnObj;
 
         private List<Image> _armySlotIcons = new List<Image>();
         private List<TextMeshProUGUI> _armySlotCountTexts = new List<TextMeshProUGUI>();
@@ -88,9 +89,12 @@ namespace HommClone.World
             }
         }
 
+        private HeroData _cachedHeroData;
+
         private void RefreshData(HeroData data)
         {
             if (data == null) return;
+            _cachedHeroData = data;
 
             if (_heroNameText != null) _heroNameText.text = $"<b>{data.heroName}</b>";
 
@@ -144,6 +148,53 @@ namespace HommClone.World
                 if (gManager != null) gManager.InitializeStarterArmies();
             }
 
+            // Check if Scouting and Stealth apply when inspecting an ENEMY hero
+            var activeHeroData = GameDataManager.GetOrCreateInstance().GetActiveHero();
+            bool isEnemyHero = (activeHeroData != null && data != null && (activeHeroData != data || activeHeroData.heroName != data.heroName));
+            bool targetHasStealth = data != null && data.HasStealth();
+            bool observerHasScouting = activeHeroData != null && activeHeroData.HasScouting();
+
+            // Stealth disguise applies if inspecting an enemy who has Stealth AND observer lacks Scouting
+            bool applyStealthDisguise = isEnemyHero && targetHasStealth && !observerHasScouting;
+            // Vague counts apply if inspecting an enemy AND observer lacks Scouting (and Stealth isn't active)
+            bool applyVagueCounts = isEnemyHero && !observerHasScouting && !applyStealthDisguise;
+
+            Debug.Log($"[HeroSheet] Inspecting: '{data?.heroName}' | Active: '{activeHeroData?.heroName}' | isEnemy: {isEnemyHero} | targetHasStealth: {targetHasStealth} | observerHasScouting: {observerHasScouting} | applyStealth: {applyStealthDisguise} | applyVague: {applyVagueCounts}");
+
+            if (_skillTreeBtnObj != null)
+            {
+                _skillTreeBtnObj.SetActive(!isEnemyHero);
+            }
+
+            if (isEnemyHero && _heroNameText != null)
+            {
+                _heroNameText.text = $"<color=#FF4444><b>[ENEMY HERO] {data.heroName}</b></color>";
+            }
+
+            CreatureData disguiseCreature = null;
+            int disguiseCount = 1;
+
+            if (applyStealthDisguise && data.army != null && data.army.Count > 0)
+            {
+                int minCount = int.MaxValue;
+                float maxVal = -1f;
+
+                foreach (var slot in data.army)
+                {
+                    if (slot != null && slot.creatureData != null && slot.count > 0)
+                    {
+                        if (slot.count < minCount) minCount = slot.count;
+                        float val = slot.creatureData.AIValue > 0 ? slot.creatureData.AIValue : ((int)slot.creatureData.Tier + 1) * 100f;
+                        if (val > maxVal)
+                        {
+                            maxVal = val;
+                            disguiseCreature = slot.creatureData;
+                        }
+                    }
+                }
+                if (minCount != int.MaxValue) disguiseCount = minCount;
+            }
+
             // Populate 7 Army Slots
             for (int i = 0; i < 7; i++)
             {
@@ -154,26 +205,40 @@ namespace HommClone.World
                         var slot = data.army[i];
                         _armySlotIcons[i].gameObject.SetActive(true);
 
-                        if (slot.creatureData.Icon != null)
+                        CreatureData renderData = (applyStealthDisguise && disguiseCreature != null) ? disguiseCreature : slot.creatureData;
+                        
+                        string countText;
+                        if (applyStealthDisguise)
                         {
-                            _armySlotIcons[i].sprite = slot.creatureData.Icon;
+                            countText = $"<b>{disguiseCount}</b>";
+                        }
+                        else if (applyVagueCounts)
+                        {
+                            countText = $"<b>{MonsterInspectionUI.GetVagueDescriptor(slot.count)}</b>";
+                        }
+                        else
+                        {
+                            countText = $"<b>{slot.count}</b>";
+                        }
+
+                        if (renderData.Icon != null)
+                        {
+                            _armySlotIcons[i].sprite = renderData.Icon;
                             _armySlotIcons[i].color = Color.white;
                         }
                         else
                         {
-                            // Fallback colored icon if sprite icon not set yet
                             _armySlotIcons[i].sprite = null;
                             _armySlotIcons[i].color = new Color(0.35f, 0.55f, 0.85f, 1f);
                         }
 
                         if (_armySlotCountTexts[i] != null)
                         {
-                            _armySlotCountTexts[i].text = $"<b>{slot.count}</b>";
+                            _armySlotCountTexts[i].text = countText;
                         }
                     }
                     else
                     {
-                        // Empty Slot
                         _armySlotIcons[i].gameObject.SetActive(false);
                         if (_armySlotCountTexts[i] != null) _armySlotCountTexts[i].text = "";
                     }
@@ -280,6 +345,39 @@ namespace HommClone.World
             xRect.anchorMax = Vector2.one;
             xRect.offsetMin = Vector2.zero;
             xRect.offsetMax = Vector2.zero;
+
+            // Skill Tree Modal Launch Button
+            _skillTreeBtnObj = new GameObject("SkillTreeBtn");
+            _skillTreeBtnObj.transform.SetParent(innerPanel.transform, false);
+            RectTransform stRect = _skillTreeBtnObj.AddComponent<RectTransform>();
+            stRect.anchorMin = new Vector2(0.68f, 0.88f);
+            stRect.anchorMax = new Vector2(0.88f, 0.96f);
+            stRect.offsetMin = Vector2.zero;
+            stRect.offsetMax = Vector2.zero;
+            Image stImg = _skillTreeBtnObj.AddComponent<Image>();
+            stImg.color = new Color(0.2f, 0.5f, 0.2f);
+            Button stBtn = _skillTreeBtnObj.AddComponent<Button>();
+            stBtn.onClick.AddListener(() =>
+            {
+                if (_cachedHeroData != null)
+                {
+                    HideWindow();
+                    UI.AdventureSkillTreeUI.GetOrCreateInstance().Show(_cachedHeroData);
+                }
+            });
+
+            GameObject stTxt = new GameObject("Text");
+            stTxt.transform.SetParent(_skillTreeBtnObj.transform, false);
+            var tTxt = stTxt.AddComponent<TextMeshProUGUI>();
+            tTxt.text = "<b>🌳 SKILLS</b>";
+            tTxt.alignment = TextAlignmentOptions.Center;
+            tTxt.fontSize = 11;
+            tTxt.color = Color.white;
+            RectTransform tRect = stTxt.GetComponent<RectTransform>();
+            tRect.anchorMin = Vector2.zero;
+            tRect.anchorMax = Vector2.one;
+            tRect.offsetMin = Vector2.zero;
+            tRect.offsetMax = Vector2.zero;
 
             // Stats Text
             GameObject statsObj = new GameObject("StatsText");

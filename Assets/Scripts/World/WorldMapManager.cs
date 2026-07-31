@@ -77,38 +77,33 @@ namespace HommClone.World
             var manager = GameDataManager.GetOrCreateInstance();
             WorldHero[] heroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
 
-            WorldHero p1Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 1);
-            WorldHero p2Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 2);
+            WorldHero p1Hero = null;
+            WorldHero p2Hero = null;
 
-            // If p1Hero is missing, pick the first available hero
-            if (p1Hero == null && heroes.Length > 0)
+            if (heroes != null && heroes.Length >= 2)
             {
                 p1Hero = heroes[0];
-                p1Hero.SetPlayerIndexAndPosition(1, new Vector2Int(2, 2));
-            }
+                p1Hero.SetPlayerIndexAndPosition(1, p1Hero.GridPosition != Vector2Int.zero ? p1Hero.GridPosition : new Vector2Int(2, 2));
 
-            // If p2Hero is missing, pick second available hero or create auto-spawn
-            if (p2Hero == null)
+                p2Hero = heroes[1];
+                p2Hero.SetPlayerIndexAndPosition(2, p2Hero.GridPosition != Vector2Int.zero ? p2Hero.GridPosition : new Vector2Int(18, 18));
+            }
+            else
             {
-                WorldHero unassigned = System.Array.Find(heroes, h => h != null && h != p1Hero);
-                if (unassigned != null)
+                p1Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 1);
+                if (p1Hero == null && heroes != null && heroes.Length > 0)
                 {
-                    p2Hero = unassigned;
-                    p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
+                    p1Hero = heroes[0];
+                    p1Hero.SetPlayerIndexAndPosition(1, new Vector2Int(2, 2));
                 }
-                else
+
+                p2Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 2);
+                if (p2Hero == null)
                 {
                     GameObject obj = new GameObject("WorldHero_Player2");
                     p2Hero = obj.AddComponent<WorldHero>();
                     p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
                 }
-            }
-
-            // Ensure p1 and p2 don't overlap positions
-            if (p1Hero != null && p1Hero.GridPosition == Vector2Int.zero) p1Hero.SnapToGridPosition(new Vector2Int(2, 2));
-            if (p2Hero != null && (p1Hero != null && p2Hero.GridPosition == p1Hero.GridPosition))
-            {
-                p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
             }
 
             if (manager != null)
@@ -190,6 +185,9 @@ namespace HommClone.World
             }
         }
 
+        private Vector2Int _selectedTargetPos = new Vector2Int(-1, -1);
+        private List<Vector2Int> _selectedPath = null;
+
         private void Update()
         {
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
@@ -208,19 +206,33 @@ namespace HommClone.World
             // Block 3D world raycasting if mouse is over UI elements!
             if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
             {
-                ClearPathHighlight();
                 return;
             }
 
             Vector2 mousePos = Mouse.current.position.ReadValue();
             Ray ray = Camera.main.ScreenPointToRay(mousePos);
 
-            // Right-Click to open Hero Character Sheet or Monster Stack Inspection Modal
+            // Right-Click to inspect or cancel selected path
             if (Mouse.current.rightButton.wasPressedThisFrame)
             {
                 if (Physics.Raycast(ray, out RaycastHit rHit))
                 {
                     WorldHero hero = rHit.collider.GetComponentInParent<WorldHero>() ?? rHit.collider.GetComponent<WorldHero>();
+                    WorldTile tile = rHit.collider.GetComponentInParent<WorldTile>() ?? rHit.collider.GetComponent<WorldTile>();
+
+                    if (hero == null && tile != null)
+                    {
+                        WorldHero[] allHeroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
+                        foreach (var h in allHeroes)
+                        {
+                            if (h != null && h.GridPosition == tile.GridPosition)
+                            {
+                                hero = h;
+                                break;
+                            }
+                        }
+                    }
+
                     if (hero != null)
                     {
                         var sheet = HeroCharacterSheetUI.GetOrCreateInstance();
@@ -236,43 +248,70 @@ namespace HommClone.World
                         return;
                     }
                 }
+
+                // Deselect current path or interrupt active hero movement on right click!
+                if (_activeHero != null && _activeHero.IsMoving)
+                {
+                    _activeHero.StopMovement();
+                }
+
+                ClearPathHighlight();
+                _selectedTargetPos = new Vector2Int(-1, -1);
+                _selectedPath = null;
+            }
+
+            // Disable End Turn button while hero is moving to prevent desync
+            if (endTurnButton != null && _activeHero != null)
+            {
+                endTurnButton.interactable = !_activeHero.IsMoving;
             }
 
             if (_activeHero == null || _activeHero.IsMoving || _gridManager == null) return;
 
-            // Raycast mouse hovering for path preview
-            if (Physics.Raycast(ray, out RaycastHit hit))
+            // Left-Click for 2-Step Path Selection & Confirmation (HoMM Classic Style!)
+            if (Mouse.current.leftButton.wasPressedThisFrame)
             {
-                WorldTile tile = hit.collider.GetComponentInParent<WorldTile>() ?? hit.collider.GetComponent<WorldTile>();
-                WorldMonsterStack targetMonster = hit.collider.GetComponentInParent<WorldMonsterStack>() ?? hit.collider.GetComponent<WorldMonsterStack>();
-
-                Vector2Int targetPos = targetMonster != null ? targetMonster.GridPosition : (tile != null ? tile.GridPosition : new Vector2Int(-1, -1));
-
-                if (targetPos != new Vector2Int(-1, -1))
+                if (Physics.Raycast(ray, out RaycastHit hit))
                 {
-                    // Generate path preview
-                    List<Vector2Int> path = _gridManager.FindPath(_activeHero.GridPosition, targetPos);
-                    HighlightCurrentPath(path);
+                    WorldTile tile = hit.collider.GetComponentInParent<WorldTile>() ?? hit.collider.GetComponent<WorldTile>();
+                    WorldMonsterStack targetMonster = hit.collider.GetComponentInParent<WorldMonsterStack>() ?? hit.collider.GetComponent<WorldMonsterStack>();
+                    WorldHero targetHero = hit.collider.GetComponentInParent<WorldHero>() ?? hit.collider.GetComponent<WorldHero>();
 
-                    // Left Click to execute movement / battle encounter
-                    if (Mouse.current.leftButton.wasPressedThisFrame && path != null && path.Count > 1)
+                    Vector2Int targetPos = new Vector2Int(-1, -1);
+                    if (targetMonster != null) targetPos = targetMonster.GridPosition;
+                    else if (targetHero != null && targetHero != _activeHero) targetPos = targetHero.GridPosition;
+                    else if (tile != null) targetPos = tile.GridPosition;
+
+                    if (targetPos != new Vector2Int(-1, -1) && targetPos != _activeHero.GridPosition)
                     {
-                        List<Vector2Int> movePath = new List<Vector2Int>(path);
+                        // 2nd Click on SAME target tile -> CONFIRM & EXECUTE MOVEMENT!
+                        if (targetPos == _selectedTargetPos && _selectedPath != null && _selectedPath.Count > 1)
+                        {
+                            List<Vector2Int> movePath = new List<Vector2Int>(_selectedPath);
+                            ClearPathHighlight();
+                            _selectedTargetPos = new Vector2Int(-1, -1);
+                            _selectedPath = null;
+
+                            StartCoroutine(_activeHero.MoveAlongPathCoroutine(movePath, () => {
+                                UpdateUI();
+                                CheckTileEncounter(_activeHero.GridPosition);
+                            }));
+                        }
+                        // 1st Click on NEW target tile -> PROJECT PATH PREVIEW!
+                        else
+                        {
+                            _selectedTargetPos = targetPos;
+                            _selectedPath = _gridManager.FindPath(_activeHero.GridPosition, targetPos);
+                            HighlightCurrentPath(_selectedPath);
+                        }
+                    }
+                    else
+                    {
                         ClearPathHighlight();
-                        StartCoroutine(_activeHero.MoveAlongPathCoroutine(movePath, () => {
-                            UpdateUI();
-                            CheckTileEncounter(_activeHero.GridPosition);
-                        }));
+                        _selectedTargetPos = new Vector2Int(-1, -1);
+                        _selectedPath = null;
                     }
                 }
-                else
-                {
-                    ClearPathHighlight();
-                }
-            }
-            else
-            {
-                ClearPathHighlight();
             }
         }
 
@@ -297,6 +336,21 @@ namespace HommClone.World
 
         public bool IsEncounterTile(Vector2Int pos)
         {
+            var manager = GameDataManager.GetOrCreateInstance();
+
+            // 0. Direct Enemy Hero tile
+            if (manager != null)
+            {
+                WorldHero[] heroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
+                foreach (var h in heroes)
+                {
+                    if (h != null && h.PlayerIndex != manager.activePlayerIndex && h.GridPosition == pos)
+                    {
+                        return true;
+                    }
+                }
+            }
+
             // 1. Direct monster stack tile
             WorldMonsterStack[] monsters = FindObjectsByType<WorldMonsterStack>(FindObjectsSortMode.None);
             foreach (var m in monsters)
@@ -637,8 +691,14 @@ namespace HommClone.World
         /// </summary>
         public void OnEndTurnClicked()
         {
+            if (_activeHero != null && _activeHero.IsMoving) return; // Cannot skip day while hero is moving!
             if (Time.time - _lastEndTurnTime < 0.5f) return; // Debounce to prevent double-click skips!
             _lastEndTurnTime = Time.time;
+
+            // Clear any projected path trail on day skip/end turn
+            ClearPathHighlight();
+            _selectedTargetPos = new Vector2Int(-1, -1);
+            _selectedPath = null;
 
             var manager = GameDataManager.GetOrCreateInstance();
             if (manager == null) return;
@@ -647,6 +707,7 @@ namespace HommClone.World
             {
                 // Switch to Player 2
                 manager.activePlayerIndex = 2;
+                manager.player2Hero.maxMovementPoints = manager.player2Hero.GetEffectiveMaxMovementPoints();
                 manager.player2Hero.currentMovementPoints = manager.player2Hero.maxMovementPoints;
 
                 FocusCameraOnActiveHero();
@@ -670,6 +731,7 @@ namespace HommClone.World
 
                 // Switch to Player 1
                 manager.activePlayerIndex = 1;
+                manager.player1Hero.maxMovementPoints = manager.player1Hero.GetEffectiveMaxMovementPoints();
                 manager.player1Hero.currentMovementPoints = manager.player1Hero.maxMovementPoints;
 
                 FocusCameraOnActiveHero();
