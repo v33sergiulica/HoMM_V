@@ -18,3 +18,7 @@ A chronological archive of completed features and tasks.
 - **2026-07-14**: Refactored & Balanced Creature `AIValue` Power Rating formula in `CreatureData.cs` with tankiness factor `y` (based on raw attack `rawA`) and offensive factor `x`.
 - **2026-07-14**: Resolved URP pipeline shader material rendering and root placeholder mesh toggling issues.
 - **2026-07-21**: Implemented Iterative Deepening Minimax AI Engine (`MinimaxSearchEngine.cs`, `VirtualBattleState.cs`, `BattleAIManager.cs`) featuring Alpha-Beta Pruning, 2.0s thinking time budget, and Threat Map Kiting/Safe-Approach tile candidate evaluation.
+- **2026-07-31**: Fixed Hotseat PvP Combat Army loading and deployment hero side visibility.
+- **2026-07-31**: Implemented 2-Click World Map movement system (zero A* hover lag) with right-click movement cancellation and turn advance protection.
+- **2026-07-31**: Added Red Danger Highlights on World Map when hovering over enemy heroes or monster encounter tiles.
+- **2026-07-31**: Implemented procedurally rendered **Adventure & Navigation Skill Tree** (`AdventureSkillTree.cs`, `AdventureSkillTreeUI.cs`) based on user Paint design, featuring Logistics I-III, Pathfinding I-II, Scouting (exact vs vague HoMM count descriptors), and Stealth mechanics.
