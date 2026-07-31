@@ -84,8 +84,28 @@ namespace HommClone.Creatures
             _hasDefendedBonus = false;
             activeEffects.Clear();
 
+            ApplyHeroModifiers();
+
             UpdateVisualLabels();
             CreateDynamicModel();
+        }
+
+        public void ApplyHeroModifiers()
+        {
+            var manager = GameDataManager.Instance;
+            if (manager == null) return;
+
+            HeroData hero = (playerIndex == 1) ? manager.player1Hero : manager.player2Hero;
+            if (hero != null)
+            {
+                var mods = Heroes.HeroBattleModifiers.FromHero(hero);
+                _attackBonus += mods.attackBonus;
+                _defenseBonus += mods.defenseBonus;
+                _moraleModifier += mods.moraleBonus;
+                _luckModifier += mods.luckBonus;
+
+                Debug.Log($"[HeroBattleModifiers] Applied Hero Mods to {gameObject.name} (P{playerIndex}): +{mods.attackBonus} Att, +{mods.defenseBonus} Def, +{mods.moraleBonus} Morale, +{mods.luckBonus} Luck");
+            }
         }
 
         public void CreateDynamicModel()

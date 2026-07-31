@@ -27,7 +27,9 @@ namespace HommClone.World
         [SerializeField] private Renderer flagRenderer;
 
         public ResourceType MineType => mineType;
+        public ResourceType Type => mineType;
         public int DailyIncome => dailyIncome;
+        public int Income => dailyIncome;
         public Vector2Int GridPosition => gridPosition;
         public int OwnerPlayerIndex => ownerPlayerIndex;
 

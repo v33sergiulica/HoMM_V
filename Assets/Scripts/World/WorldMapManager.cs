@@ -39,17 +39,24 @@ namespace HommClone.World
             var audioManager = HommClone.Audio.AudioManager.GetOrCreateInstance();
             if (audioManager != null) audioManager.PlayWorldMapMusic();
             _gridManager = FindFirstObjectByType<WorldGridManager>();
-            _activeHero = FindFirstObjectByType<WorldHero>();
+
+            var manager = GameDataManager.GetOrCreateInstance();
+            if (manager != null)
+            {
+                manager.activePlayerIndex = 1; // Always start game on Player 1's turn
+            }
 
             UI.ResourceBarUI.GetOrCreateInstance();
 
             if (endTurnButton != null)
             {
+                endTurnButton.onClick.RemoveAllListeners();
                 endTurnButton.onClick.AddListener(OnEndTurnClicked);
             }
 
             if (heroHUDButton != null)
             {
+                heroHUDButton.onClick.RemoveAllListeners();
                 heroHUDButton.onClick.AddListener(OnHeroHUDClicked);
             }
 
@@ -58,7 +65,57 @@ namespace HommClone.World
                 CreateWorldUI();
             }
 
+            EnsurePlayerHeroesExist();
+            FocusCameraOnActiveHero();
+            UpdateUI();
+
             CheckPostBattleCleanup();
+        }
+
+        private void EnsurePlayerHeroesExist()
+        {
+            var manager = GameDataManager.GetOrCreateInstance();
+            WorldHero[] heroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
+
+            WorldHero p1Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 1);
+            WorldHero p2Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 2);
+
+            // If p1Hero is missing, pick the first available hero
+            if (p1Hero == null && heroes.Length > 0)
+            {
+                p1Hero = heroes[0];
+                p1Hero.SetPlayerIndexAndPosition(1, new Vector2Int(2, 2));
+            }
+
+            // If p2Hero is missing, pick second available hero or create auto-spawn
+            if (p2Hero == null)
+            {
+                WorldHero unassigned = System.Array.Find(heroes, h => h != null && h != p1Hero);
+                if (unassigned != null)
+                {
+                    p2Hero = unassigned;
+                    p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
+                }
+                else
+                {
+                    GameObject obj = new GameObject("WorldHero_Player2");
+                    p2Hero = obj.AddComponent<WorldHero>();
+                    p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
+                }
+            }
+
+            // Ensure p1 and p2 don't overlap positions
+            if (p1Hero != null && p1Hero.GridPosition == Vector2Int.zero) p1Hero.SnapToGridPosition(new Vector2Int(2, 2));
+            if (p2Hero != null && (p1Hero != null && p2Hero.GridPosition == p1Hero.GridPosition))
+            {
+                p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
+            }
+
+            if (manager != null)
+            {
+                if (p1Hero != null) manager.player1Hero.worldPosition = p1Hero.GridPosition;
+                if (p2Hero != null) manager.player2Hero.worldPosition = p2Hero.GridPosition;
+            }
         }
 
         private void CreateMine(ResourceType type, int income, Vector2Int pos)
@@ -113,6 +170,22 @@ namespace HommClone.World
                             p.Collect(1);
                         }
                     }
+
+                    // Award Experience Points for winning the battle encounter
+                    int xpReward = 1200;
+                    bool leveledUp = manager.player1Hero.GainXP(xpReward, out LevelUpInfo lvlInfo);
+                    Debug.Log($"[WorldMapManager] Hero {manager.player1Hero.heroName} gained {xpReward} XP! Current XP: {manager.player1Hero.currentXP}/{manager.player1Hero.xpToNextLevel} (Level {manager.player1Hero.level})");
+
+                    if (leveledUp)
+                    {
+                        var levelUpUI = UI.HeroLevelUpUI.Instance;
+                        if (levelUpUI == null)
+                        {
+                            GameObject uiObj = new GameObject("HeroLevelUpUI");
+                            levelUpUI = uiObj.AddComponent<UI.HeroLevelUpUI>();
+                        }
+                        levelUpUI.ShowLevelUp(manager.player1Hero, lvlInfo);
+                    }
                 }
             }
         }
@@ -126,7 +199,7 @@ namespace HommClone.World
             }
 
             if (_gridManager == null) _gridManager = FindFirstObjectByType<WorldGridManager>();
-            if (_activeHero == null) _activeHero = FindFirstObjectByType<WorldHero>();
+            _activeHero = GetActiveWorldHero();
 
             UpdateUI();
 
@@ -234,33 +307,33 @@ namespace HommClone.World
                 }
             }
 
-            // 2. Guarded pickable resource
+            // 2. Guarded pickable resource tile
             WorldResourcePickable[] pickables = FindObjectsByType<WorldResourcePickable>(FindObjectsSortMode.None);
             foreach (var p in pickables)
             {
-                if (p != null)
+                if (p != null && p.GridPosition == pos && CheckGuardedInteraction(p.GridPosition, out _))
                 {
-                    int dx = Mathf.Abs(p.GridPosition.x - pos.x);
-                    int dy = Mathf.Abs(p.GridPosition.y - pos.y);
-                    if (dx <= 1 && dy <= 1 && CheckGuardedInteraction(p.GridPosition, out _))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
 
-            // 3. Guarded mine / factory
+            // 3. Guarded mine / factory tile
             WorldMine[] mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
             foreach (var mine in mines)
             {
-                if (mine != null)
+                if (mine != null && mine.GridPosition == pos && CheckGuardedInteraction(mine.GridPosition, out _))
                 {
-                    int dx = Mathf.Abs(mine.GridPosition.x - pos.x);
-                    int dy = Mathf.Abs(mine.GridPosition.y - pos.y);
-                    if (dx <= 1 && dy <= 1 && CheckGuardedInteraction(mine.GridPosition, out _))
-                    {
-                        return true;
-                    }
+                    return true;
+                }
+            }
+
+            // 4. Guarded treasure chest tile
+            WorldTreasureChest[] chests = FindObjectsByType<WorldTreasureChest>(FindObjectsSortMode.None);
+            foreach (var chest in chests)
+            {
+                if (chest != null && chest.GridPosition == pos && CheckGuardedInteraction(chest.GridPosition, out _))
+                {
+                    return true;
                 }
             }
 
@@ -269,6 +342,22 @@ namespace HommClone.World
 
         public bool CheckTileEncounter(Vector2Int heroPos)
         {
+            var manager = GameDataManager.GetOrCreateInstance();
+
+            // 0. Check PvP Hero vs Hero encounter
+            if (manager != null)
+            {
+                WorldHero[] heroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
+                foreach (var h in heroes)
+                {
+                    if (h != null && h.PlayerIndex != manager.activePlayerIndex && h.GridPosition == heroPos)
+                    {
+                        TriggerPvPBattleEncounter(h);
+                        return true; // PvP Battle triggered!
+                    }
+                }
+            }
+
             // 1. Check direct monster stack encounters (Must step directly onto monster stack tile!)
             WorldMonsterStack[] monsters = FindObjectsByType<WorldMonsterStack>(FindObjectsSortMode.None);
             foreach (var m in monsters)
@@ -280,52 +369,63 @@ namespace HommClone.World
                 }
             }
 
-            // 2. Check pickable resources (cardinal & diagonal 8-neighbor adjacency)
+            // 2. Check pickable resources (Must step on resource tile)
             WorldResourcePickable[] pickables = FindObjectsByType<WorldResourcePickable>(FindObjectsSortMode.None);
             foreach (var p in pickables)
             {
-                if (p != null)
+                if (p != null && p.GridPosition == heroPos)
                 {
-                    int dx = Mathf.Abs(p.GridPosition.x - heroPos.x);
-                    int dy = Mathf.Abs(p.GridPosition.y - heroPos.y);
-                    if (dx <= 1 && dy <= 1) // On or adjacent
+                    if (CheckGuardedInteraction(p.GridPosition, out var guardMonster))
                     {
-                        if (CheckGuardedInteraction(p.GridPosition, out var guardMonster))
-                        {
-                            Debug.Log($"[WorldMapManager] Resource at {p.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
-                            TriggerBattleEncounter(guardMonster);
-                            return true; // Battle triggered!
-                        }
-                        else if (heroPos == p.GridPosition)
-                        {
-                            p.Collect(1);
-                            return false;
-                        }
+                        Debug.Log($"[WorldMapManager] Resource at {p.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
+                        TriggerBattleEncounter(guardMonster);
+                        return true; // Battle triggered!
+                    }
+                    else
+                    {
+                        p.Collect(1);
+                        return false;
                     }
                 }
             }
 
-            // 3. Check mines / factories (cardinal & diagonal 8-neighbor adjacency)
+            // 3. Check mines / factories (Must step on mine tile)
             WorldMine[] mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
             foreach (var mine in mines)
             {
-                if (mine != null)
+                if (mine != null && mine.GridPosition == heroPos)
                 {
-                    int dx = Mathf.Abs(mine.GridPosition.x - heroPos.x);
-                    int dy = Mathf.Abs(mine.GridPosition.y - heroPos.y);
-                    if (dx <= 1 && dy <= 1) // On or adjacent
+                    if (CheckGuardedInteraction(mine.GridPosition, out var guardMonster))
                     {
-                        if (CheckGuardedInteraction(mine.GridPosition, out var guardMonster))
-                        {
-                            Debug.Log($"[WorldMapManager] Mine at {mine.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
-                            TriggerBattleEncounter(guardMonster);
-                            return true; // Battle triggered!
-                        }
-                        else
-                        {
-                            mine.ClaimMine(1);
-                            return false;
-                        }
+                        Debug.Log($"[WorldMapManager] Mine at {mine.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
+                        TriggerBattleEncounter(guardMonster);
+                        return true; // Battle triggered!
+                    }
+                    else
+                    {
+                        mine.ClaimMine(1);
+                        return false;
+                    }
+                }
+            }
+
+            // 4. Check treasure chests (Must step on chest tile)
+            WorldTreasureChest[] chests = FindObjectsByType<WorldTreasureChest>(FindObjectsSortMode.None);
+            foreach (var chest in chests)
+            {
+                if (chest != null && chest.GridPosition == heroPos)
+                {
+                    if (CheckGuardedInteraction(chest.GridPosition, out var guardMonster))
+                    {
+                        Debug.Log($"[WorldMapManager] Treasure Chest at {chest.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
+                        TriggerBattleEncounter(guardMonster);
+                        return true; // Battle triggered!
+                    }
+                    else
+                    {
+                        HeroData heroData = _activeHero != null ? _activeHero.Data : GameDataManager.GetOrCreateInstance().player1Hero;
+                        chest.Interact(heroData);
+                        return false;
                     }
                 }
             }
@@ -360,9 +460,42 @@ namespace HommClone.World
                 {
                     UnityEngine.SceneManagement.SceneManager.LoadScene(1);
                 }
-                else
+            }
+        }
+
+        public void TriggerPvPBattleEncounter(WorldHero enemyHero)
+        {
+            if (enemyHero == null) return;
+            var manager = GameDataManager.GetOrCreateInstance();
+            if (manager == null) return;
+
+            manager.isPvPBattle = true;
+            manager.pendingBattleEnemyArmy.Clear();
+
+            HeroData enemyHeroData = enemyHero.Data;
+            if (enemyHeroData != null && enemyHeroData.army != null)
+            {
+                foreach (var slot in enemyHeroData.army)
                 {
-                    Debug.LogError($"[WorldMapManager] Could not load scene '{targetScene}'! Please open File > Build Settings in Unity and drag your Battle scene into 'Scenes In Build'!");
+                    if (slot != null && slot.creatureData != null && slot.count > 0)
+                    {
+                        manager.pendingBattleEnemyArmy.Add(new ArmySlot(slot.creatureData, slot.count));
+                    }
+                }
+            }
+
+            Debug.Log($"[WorldMapManager] Triggering PvP Battle Encounter: Player {manager.activePlayerIndex} Hero vs Player {enemyHero.PlayerIndex} Hero at {enemyHero.GridPosition}!");
+
+            string targetScene = !string.IsNullOrEmpty(battleSceneName) ? battleSceneName : "BattleScene";
+            try
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene(targetScene);
+            }
+            catch
+            {
+                if (UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings > 1)
+                {
+                    UnityEngine.SceneManagement.SceneManager.LoadScene(1);
                 }
             }
         }
@@ -429,16 +562,16 @@ namespace HommClone.World
             var manager = GameDataManager.GetOrCreateInstance();
             if (manager != null)
             {
-                var r = manager.player1Resources;
-                if (resourceText != null)
+                var r = manager.GetActiveResources();
+                if (resourceText != null && r != null)
                 {
-                    resourceText.text = $"Gold: {r.gold} | Wood: {r.wood} | Ore: {r.ore} | Gems: {r.gems}";
+                    resourceText.text = $"P{manager.activePlayerIndex} Gold: {r.gold} | Wood: {r.wood} | Ore: {r.ore} | Gems: {r.gems}";
                 }
 
-                var h = manager.player1Hero;
+                var h = manager.GetActiveHero();
                 if (heroInfoText != null && h != null)
                 {
-                    heroInfoText.text = $"MP: {h.currentMovementPoints:F1} / {h.maxMovementPoints:F1}";
+                    heroInfoText.text = $"P{manager.activePlayerIndex} MP: {h.currentMovementPoints:F1} / {h.maxMovementPoints:F1}";
                 }
 
                 if (dateText != null)
@@ -488,25 +621,112 @@ namespace HommClone.World
         public void OnHeroHUDClicked()
         {
             Debug.Log("[WorldMapManager] Hero HUD Button Clicked!");
-            if (_activeHero == null) _activeHero = FindFirstObjectByType<WorldHero>();
+            var manager = GameDataManager.GetOrCreateInstance();
+            var hData = manager != null ? manager.GetActiveHero() : null;
             var sheet = HeroCharacterSheetUI.GetOrCreateInstance();
-            if (_activeHero != null && sheet != null)
+            if (hData != null && sheet != null)
             {
-                sheet.ShowWindow(_activeHero.Data);
+                sheet.ShowWindow(hData);
             }
         }
 
+        private float _lastEndTurnTime = 0f;
+
         /// <summary>
-        /// Call this method from your custom End Turn button OnClick event in Unity Inspector!
+        /// Executes Hotseat Turn Switching between Player 1 & Player 2.
         /// </summary>
         public void OnEndTurnClicked()
         {
+            if (Time.time - _lastEndTurnTime < 0.5f) return; // Debounce to prevent double-click skips!
+            _lastEndTurnTime = Time.time;
+
             var manager = GameDataManager.GetOrCreateInstance();
-            if (manager != null)
+            if (manager == null) return;
+
+            if (manager.activePlayerIndex == 1)
             {
-                manager.ProcessDaySkip();
+                // Switch to Player 2
+                manager.activePlayerIndex = 2;
+                manager.player2Hero.currentMovementPoints = manager.player2Hero.maxMovementPoints;
+
+                FocusCameraOnActiveHero();
                 UpdateUI();
-                Debug.Log($"[WorldMapManager] End Turn: Advanced to Month {manager.currentMonth}, Week {manager.currentWeek}, Day {manager.currentDay}. Daily mine resources collected.");
+
+                var announce = UI.TurnAnnouncementUI.Instance;
+                if (announce == null)
+                {
+                    GameObject aObj = new GameObject("TurnAnnouncementUI");
+                    announce = aObj.AddComponent<UI.TurnAnnouncementUI>();
+                }
+                announce.AnnounceTurn(2, manager.currentDay);
+
+                Debug.Log($"[WorldMapManager] Hotseat Turn Switched to Player 2!");
+            }
+            else
+            {
+                // Advance Day & Process Daily Income for Both Players
+                manager.ProcessDaySkip();
+                manager.ProcessDailyIncome();
+
+                // Switch to Player 1
+                manager.activePlayerIndex = 1;
+                manager.player1Hero.currentMovementPoints = manager.player1Hero.maxMovementPoints;
+
+                FocusCameraOnActiveHero();
+                UpdateUI();
+
+                var announce = UI.TurnAnnouncementUI.Instance;
+                if (announce == null)
+                {
+                    GameObject aObj = new GameObject("TurnAnnouncementUI");
+                    announce = aObj.AddComponent<UI.TurnAnnouncementUI>();
+                }
+                announce.AnnounceTurn(1, manager.currentDay);
+
+                Debug.Log($"[WorldMapManager] End Turn: Advanced to Day {manager.currentDay}! Switched turn to Player 1.");
+            }
+        }
+
+        public WorldHero GetActiveWorldHero()
+        {
+            var manager = GameDataManager.GetOrCreateInstance();
+            int activeIdx = manager != null ? manager.activePlayerIndex : 1;
+
+            WorldHero[] heroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
+            WorldHero target = System.Array.Find(heroes, h => h != null && h.PlayerIndex == activeIdx);
+
+            if (target != null)
+            {
+                _activeHero = target;
+            }
+            else if (_activeHero == null && heroes.Length > 0)
+            {
+                _activeHero = heroes[0];
+            }
+            return _activeHero;
+        }
+
+        public void FocusCameraOnActiveHero()
+        {
+            var manager = GameDataManager.GetOrCreateInstance();
+            if (manager == null) return;
+
+            WorldHero[] heroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
+            foreach (var h in heroes)
+            {
+                if (h != null && h.PlayerIndex == manager.activePlayerIndex)
+                {
+                    _activeHero = h;
+                    if (Camera.main != null)
+                    {
+                        Vector3 targetCam = h.transform.position;
+                        targetCam.y = Camera.main.transform.position.y;
+                        targetCam.z = h.transform.position.z - 6f; // Position camera view behind hero
+                        Camera.main.transform.position = targetCam;
+                    }
+                    Debug.Log($"[WorldMapManager] Camera focused on Player {manager.activePlayerIndex} Hero '{h.name}' at position {h.transform.position} (Grid: {h.GridPosition})!");
+                    break;
+                }
             }
         }
 

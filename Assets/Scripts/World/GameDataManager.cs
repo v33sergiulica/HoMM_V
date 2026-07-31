@@ -28,6 +28,19 @@ namespace HommClone.World
     }
 
     [System.Serializable]
+    public struct LevelUpInfo
+    {
+        public int levelReached;
+        public string statGained;
+
+        public LevelUpInfo(int lvl, string stat)
+        {
+            levelReached = lvl;
+            statGained = stat;
+        }
+    }
+
+    [System.Serializable]
     public class HeroData
     {
         public string heroName = "Knight";
@@ -35,12 +48,72 @@ namespace HommClone.World
         public GameObject heroPrefab;
         public float maxMovementPoints = 15f;
         public float currentMovementPoints = 15f;
+        public int level = 1;
+        public int currentXP = 0;
+        public int xpToNextLevel = 1000;
         public int attack = 2;
         public int defense = 2;
         public int spellPower = 1;
         public int knowledge = 1;
         public Vector2Int worldPosition = new Vector2Int(2, 2);
         public List<ArmySlot> army = new List<ArmySlot>();
+        public List<HommClone.Heroes.SecondarySkillSlot> secondarySkills = new List<HommClone.Heroes.SecondarySkillSlot>();
+
+        public int GetXPForNextLevel(int lvl)
+        {
+            return Mathf.RoundToInt(1000f * Mathf.Pow(1.25f, lvl - 1));
+        }
+
+        public List<LevelUpInfo> pendingLevelUpInfos = new List<LevelUpInfo>();
+
+        public bool GainXP(int amount, out LevelUpInfo info)
+        {
+            info = new LevelUpInfo(level, "");
+            currentXP += amount;
+            bool leveledUp = false;
+
+            while (currentXP >= xpToNextLevel)
+            {
+                currentXP -= xpToNextLevel;
+                level++;
+                xpToNextLevel = GetXPForNextLevel(level);
+                leveledUp = true;
+
+                string currentLevelStat = "";
+                // Increase a primary stat randomly biased towards knight / warrior (Attack / Defense)
+                int statRoll = UnityEngine.Random.Range(0, 100);
+                if (statRoll < 35)
+                {
+                    attack++;
+                    currentLevelStat = "+1 Attack";
+                }
+                else if (statRoll < 70)
+                {
+                    defense++;
+                    currentLevelStat = "+1 Defense";
+                }
+                else if (statRoll < 85)
+                {
+                    spellPower++;
+                    currentLevelStat = "+1 Spell Power";
+                }
+                else
+                {
+                    knowledge++;
+                    currentLevelStat = "+1 Knowledge";
+                }
+
+                pendingLevelUpInfos.Add(new LevelUpInfo(level, currentLevelStat));
+            }
+
+            if (pendingLevelUpInfos.Count > 0)
+            {
+                info = pendingLevelUpInfos[0];
+                pendingLevelUpInfos.RemoveAt(0);
+            }
+
+            return leveledUp;
+        }
     }
 
     /// <summary>
@@ -63,10 +136,45 @@ namespace HommClone.World
         public bool isReturningFromBattle = false;
         public bool battleWon = false;
 
+        [Header("Hotseat Multiplayer State")]
+        public int activePlayerIndex = 1;
+        public bool isPvPBattle = false;
+
         [Header("World Turn Counter")]
         public int currentDay = 1;
         public int currentWeek = 1;
         public int currentMonth = 1;
+
+        public HeroData GetActiveHero()
+        {
+            return activePlayerIndex == 1 ? player1Hero : player2Hero;
+        }
+
+        public PlayerResources GetActiveResources()
+        {
+            return activePlayerIndex == 1 ? player1Resources : player2Resources;
+        }
+
+        public void ProcessDailyIncome()
+        {
+            WorldMine[] mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
+            foreach (var mine in mines)
+            {
+                if (mine == null || mine.OwnerPlayerIndex == 0) continue;
+                PlayerResources targetRes = (mine.OwnerPlayerIndex == 1) ? player1Resources : player2Resources;
+                if (targetRes != null)
+                {
+                    switch (mine.Type)
+                    {
+                        case ResourceType.Gold: targetRes.gold += mine.Income; break;
+                        case ResourceType.Wood: targetRes.wood += mine.Income; break;
+                        case ResourceType.Ore: targetRes.ore += mine.Income; break;
+                        case ResourceType.Gems: targetRes.gems += mine.Income; break;
+                    }
+                    Debug.Log($"[GameDataManager] Daily Income: Player {mine.OwnerPlayerIndex} received +{mine.Income} {mine.Type} from mine at {mine.GridPosition}!");
+                }
+            }
+        }
 
         private void Awake()
         {

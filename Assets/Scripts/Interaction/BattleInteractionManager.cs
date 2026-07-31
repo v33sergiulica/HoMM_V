@@ -133,8 +133,15 @@ namespace HommClone.Interaction
             Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
             bool hitSomething = Physics.Raycast(ray, out RaycastHit hit, 100f);
 
+            bool hoveringUnit = false;
+            if (hitSomething)
+            {
+                CreatureStack hStack = hit.collider.GetComponentInParent<CreatureStack>();
+                if (hStack != null && !hStack.IsHero && !hStack.IsDead) hoveringUnit = true;
+            }
+
             // Draw targets (highlights all active enemy creature stacks)
-            DrawReachableRange();
+            DrawReachableRange(hoveringUnit);
 
             if (_uiManager != null)
             {
@@ -144,6 +151,13 @@ namespace HommClone.Interaction
             if (hitSomething)
             {
                 CreatureStack hitStack = hit.collider.GetComponentInParent<CreatureStack>();
+                
+                // Show hovered unit's movement range for tactical planning
+                if (hitStack != null && !hitStack.IsDead && !hitStack.IsHero)
+                {
+                    HighlightUnitReachableRange(hitStack);
+                }
+
                 if (hitStack != null && hitStack.PlayerIndex != hero.PlayerIndex && !hitStack.IsDead && !hitStack.IsHero)
                 {
                     Tile enemyTile = _gridManager.GetTileAt(hitStack.GridPosition);
@@ -370,8 +384,15 @@ namespace HommClone.Interaction
             Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
             bool hitSomething = Physics.Raycast(ray, out RaycastHit hit, 100f);
 
+            bool hoveringOtherUnit = false;
+            if (hitSomething)
+            {
+                CreatureStack hStack = hit.collider.GetComponentInParent<CreatureStack>();
+                if (hStack != null && hStack != activeStack && !hStack.IsHero && !hStack.IsDead) hoveringOtherUnit = true;
+            }
+
             // Reset current visual frames to baseline reachable range
-            DrawReachableRange();
+            DrawReachableRange(hoveringOtherUnit);
 
             // Clear any active hover tooltips by default
             if (_uiManager != null)
@@ -388,7 +409,7 @@ namespace HommClone.Interaction
                 if (hitStack != null && hitStack.PlayerIndex != activeStack.PlayerIndex && !hitStack.IsDead && !hitStack.IsHero)
                 {
                     // Draw enemy's movement range in soft faded slate grey for tactical calculation!
-                    HighlightEnemyReachableRange(hitStack);
+                    HighlightUnitReachableRange(hitStack);
 
                     bool forceMelee = Keyboard.current != null && Keyboard.current.shiftKey.isPressed;
 
@@ -590,8 +611,9 @@ namespace HommClone.Interaction
                 // 2. Hovering an EMPTY Reachable Tile -> Movement Pathway
                 else if (hitTile != null && _reachableTiles.ContainsKey(hitTile.GridPosition))
                 {
-                    // Ensure destination is completely vacant
-                    if (_gridManager.GetCreatureAt(hitTile.GridPosition) == null)
+                    // Ensure destination is vacant or occupied only by self (for 2x2 shifting)
+                    var occupant = _gridManager.GetCreatureAt(hitTile.GridPosition);
+                    if (occupant == null || occupant == activeStack)
                     {
                         List<Vector2Int> path = _reachableTiles[hitTile.GridPosition];
 
@@ -654,14 +676,21 @@ namespace HommClone.Interaction
                         }
                     }
                 }
+                // 3. Hovering an ALLIED Stack -> Just show their movement range
+                else if (hitStack != null && hitStack.PlayerIndex == activeStack.PlayerIndex && hitStack != activeStack && !hitStack.IsDead && !hitStack.IsHero)
+                {
+                    HighlightUnitReachableRange(hitStack);
+                }
             }
         }
 
-        private void DrawReachableRange()
+        private void DrawReachableRange(bool hideForHover = false)
         {
             ClearHighlights();
 
             if (_turnManager == null || _turnManager.ActiveUnit == null || _gridManager == null) return;
+            if (hideForHover) return; // Hide standard green tiles when tactically checking another unit
+
             ITimelineParticipant active = _turnManager.ActiveUnit;
 
             if (active is Heroes.Hero hero)
@@ -738,15 +767,15 @@ namespace HommClone.Interaction
             }
         }
 
-        private void HighlightEnemyReachableRange(CreatureStack enemy)
+        private void HighlightUnitReachableRange(CreatureStack unit)
         {
-            if (enemy == null || enemy.IsDead || _gridManager == null) return;
-            var enemyReachable = _gridManager.GetReachableTiles(enemy.GridPosition, enemy.Speed, enemy.Data.IsFlying, enemy.IsLarge);
+            if (unit == null || unit.IsDead || _gridManager == null) return;
+            var reachable = _gridManager.GetReachableTiles(unit.GridPosition, unit.Speed, unit.Data.IsFlying, unit.IsLarge);
             Color fadedGrey = new Color(0.45f, 0.45f, 0.52f, 0.6f); // Soft slate grey
-            foreach (var pos in enemyReachable.Keys)
+            foreach (var pos in reachable.Keys)
             {
                 Tile tile = _gridManager.GetTileAt(pos);
-                if (tile != null && !_reachableTiles.ContainsKey(pos))
+                if (tile != null)
                 {
                     tile.SetColor(fadedGrey);
                 }

@@ -210,6 +210,17 @@ namespace HommClone.World
                     if (nTile == null || !nTile.IsPassable || closedSet.ContainsKey(neighborPos)) continue;
 
                     float stepCost = nTile.MovementCost;
+
+                    // Add high movement penalty for battle encounter tiles unless it is the final target destination
+                    if (neighborPos != target)
+                    {
+                        var mapManager = FindFirstObjectByType<WorldMapManager>();
+                        if (mapManager != null && mapManager.IsEncounterTile(neighborPos))
+                        {
+                            stepCost += 50f; // High penalty to force A* to find safe detours around monsters/battles!
+                        }
+                    }
+
                     float newGCost = current.gCost + stepCost;
 
                     if (!openSet.TryGetValue(neighborPos, out PathNode neighborNode) || newGCost < neighborNode.gCost)

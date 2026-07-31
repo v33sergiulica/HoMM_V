@@ -54,6 +54,18 @@ namespace HommClone.World
             CreateHeroVisuals();
         }
 
+        public void SetPlayerIndexAndPosition(int pIndex, Vector2Int pos)
+        {
+            playerIndex = pIndex;
+            gridPosition = pos;
+            if (Data != null)
+            {
+                Data.worldPosition = pos;
+            }
+            SnapToGridPosition(pos);
+            CreateHeroVisuals();
+        }
+
         public void SnapToGridPosition(Vector2Int pos)
         {
             gridPosition = pos;
@@ -68,21 +80,47 @@ namespace HommClone.World
 
         private void CreateHeroVisuals()
         {
-            // Simple clean 3D Low-Poly Hero Avatar model if no prefab exists
-            if (transform.childCount == 0)
+            // Clear old visual children if any
+            List<GameObject> childrenToDestroy = new List<GameObject>();
+            foreach (Transform child in transform)
             {
-                GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                body.name = "HeroModel";
-                body.transform.SetParent(transform, false);
-                body.transform.localScale = new Vector3(0.6f, 0.6f, 0.6f);
-                body.transform.localPosition = new Vector3(0f, 0.3f, 0f);
+                childrenToDestroy.Add(child.gameObject);
+            }
+            foreach (var child in childrenToDestroy)
+            {
+                if (Application.isPlaying) Destroy(child);
+                else DestroyImmediate(child);
+            }
 
-                Renderer r = body.GetComponent<Renderer>();
-                if (r != null)
-                {
-                    Color heroColor = playerIndex == 1 ? new Color(0.2f, 0.5f, 0.95f) : new Color(0.95f, 0.2f, 0.2f);
-                    MaterialUtils.SetRendererColor(r, heroColor);
-                }
+            // 1. If HeroData has a custom 3D Prefab, instantiate it!
+            if (Data != null && Data.heroPrefab != null)
+            {
+                GameObject prefabInstance = Instantiate(Data.heroPrefab, transform);
+                prefabInstance.name = "HeroPrefabModel";
+                prefabInstance.transform.localPosition = Vector3.zero;
+                prefabInstance.transform.localRotation = Quaternion.identity;
+                return;
+            }
+
+            // 2. Fallback: Low-Poly Hero Avatar model
+            GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            body.name = "HeroDynamicModel";
+            body.transform.SetParent(transform, false);
+            body.transform.localScale = new Vector3(0.6f, 0.6f, 0.6f);
+            body.transform.localPosition = new Vector3(0f, 0.3f, 0f);
+
+            var primCollider = body.GetComponent<Collider>();
+            if (primCollider != null)
+            {
+                if (Application.isPlaying) Destroy(primCollider);
+                else DestroyImmediate(primCollider);
+            }
+
+            Renderer r = body.GetComponent<Renderer>();
+            if (r != null)
+            {
+                Color heroColor = playerIndex == 1 ? new Color(0.2f, 0.5f, 0.95f) : new Color(0.95f, 0.2f, 0.2f);
+                MaterialUtils.SetRendererColor(r, heroColor);
             }
         }
 

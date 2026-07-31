@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TMPro;
 using HommClone.Creatures;
 using HommClone.Turns;
+using HommClone.World;
 
 namespace HommClone.Turns
 {
@@ -14,9 +15,6 @@ namespace HommClone.Turns
         [Header("Prefabs & Resources")]
         [SerializeField] private GameObject troopPrefab; // Standard base prefab for creature stacks
         [SerializeField] private List<CreatureData> availableCreatures = new List<CreatureData>();
-
-        [Header("Lobby Defaults")]
-        [SerializeField] private int defaultBudget = 2000;
 
         private SetupState _currentState = SetupState.Lobby;
         private bool _isPVP = false;
@@ -115,20 +113,23 @@ namespace HommClone.Turns
             var gameData = HommClone.World.GameDataManager.GetOrCreateInstance();
             if (gameData != null)
             {
+                _isPVP = gameData.isPvPBattle;
                 gameData.InitializeStarterArmies(availableCreatures);
 
                 bool hasPendingBattle = gameData.pendingBattleEnemyArmy != null && gameData.pendingBattleEnemyArmy.Count > 0;
-                bool hasHeroArmy = gameData.player1Hero.army != null && gameData.player1Hero.army.Count > 0;
+                HeroData activeHeroForBattle = gameData.GetActiveHero();
+                bool hasHeroArmy = activeHeroForBattle != null && activeHeroForBattle.army != null && activeHeroForBattle.army.Count > 0;
 
-                if (hasPendingBattle || hasHeroArmy)
+                if (hasPendingBattle || hasHeroArmy || _isPVP)
                 {
                     _p1DraftedTypes.Clear();
                     _p1DraftedCounts.Clear();
                     _p2DraftedTypes.Clear();
                     _p2DraftedCounts.Clear();
 
-                    if (hasHeroArmy)
+                    if (_isPVP)
                     {
+                        // PvP Combat: Left side is always Player 1, Right side is always Player 2
                         foreach (var slot in gameData.player1Hero.army)
                         {
                             if (slot != null && slot.creatureData != null && slot.count > 0)
@@ -137,11 +138,7 @@ namespace HommClone.Turns
                                 _p1DraftedCounts.Add(slot.count);
                             }
                         }
-                    }
-
-                    if (hasPendingBattle)
-                    {
-                        foreach (var slot in gameData.pendingBattleEnemyArmy)
+                        foreach (var slot in gameData.player2Hero.army)
                         {
                             if (slot != null && slot.creatureData != null && slot.count > 0)
                             {
@@ -150,8 +147,35 @@ namespace HommClone.Turns
                             }
                         }
                     }
+                    else
+                    {
+                        // PvE Combat: Left side is Active Hero, Right side is AI Monster
+                        if (hasHeroArmy)
+                        {
+                            foreach (var slot in activeHeroForBattle.army)
+                            {
+                                if (slot != null && slot.creatureData != null && slot.count > 0)
+                                {
+                                    _p1DraftedTypes.Add(slot.creatureData);
+                                    _p1DraftedCounts.Add(slot.count);
+                                }
+                            }
+                        }
 
-                    Debug.Log($"[BattleSetupManager] World Map Encounter detected! P1 Hero Stacks: {_p1DraftedTypes.Count}, P2 Enemy Stacks: {_p2DraftedTypes.Count}. Bypassing Draft Lobby!");
+                        if (hasPendingBattle)
+                        {
+                            foreach (var slot in gameData.pendingBattleEnemyArmy)
+                            {
+                                if (slot != null && slot.creatureData != null && slot.count > 0)
+                                {
+                                    _p2DraftedTypes.Add(slot.creatureData);
+                                    _p2DraftedCounts.Add(slot.count);
+                                }
+                            }
+                        }
+                    }
+
+                    Debug.Log($"[BattleSetupManager] World Map Encounter detected! (PvP: {_isPVP}) P1 Stacks: {_p1DraftedTypes.Count}, P2 Stacks: {_p2DraftedTypes.Count}. Bypassing Draft Lobby!");
 
                     // Start Deployment phase directly without Draft Lobby UI
                     StartDeployment();
@@ -695,6 +719,9 @@ namespace HommClone.Turns
                 _turnManager.ClearParticipants();
             }
 
+            // Spawn sideline heroes at the very start of deployment
+            SpawnSidelineHeroes();
+
             // Create deployment HUD overlays
             CreateDeploymentHUD();
 
@@ -874,9 +901,6 @@ namespace HommClone.Turns
             {
                 // Both are deployed! Commencing Combat
                 _currentState = SetupState.Combat;
-
-                // Spawn 3D sideline heroes and assign stats to creature stacks
-                SpawnSidelineHeroes();
 
                 // Close deployment UI
                 if (_deploymentHUD != null)
@@ -1298,6 +1322,21 @@ namespace HommClone.Turns
         {
             List<CreatureStack> placed = (playerIndex == 1) ? _p1Placed : _p2Placed;
 
+            // Toggle Heroes if they exist
+            var existingHeroes = FindObjectsByType<Heroes.Hero>(FindObjectsSortMode.None);
+            foreach (var h in existingHeroes)
+            {
+                if (h.PlayerIndex == playerIndex)
+                {
+                    // Toggle mesh renderers for hero
+                    var hr = h.GetComponentsInChildren<Renderer>(true);
+                    foreach (var r in hr)
+                    {
+                        r.enabled = visible;
+                    }
+                }
+            }
+
             foreach (var stack in placed)
             {
                 if (stack == null) continue;
@@ -1375,10 +1414,20 @@ namespace HommClone.Turns
                 GameObject p2Obj = new GameObject("Player2_Hero3D");
                 p2Obj.transform.position = new Vector3(11.8f, 0f, 5.5f);
                 p2Hero = p2Obj.AddComponent<Heroes.Hero>();
-                p2Hero.SetStats(5, 5, 5, 5, "Enemy Hero", null, 2);
+
+                var data = (gameData != null) ? gameData.player2Hero : null;
+                int att = data != null ? data.attack : 5;
+                int def = data != null ? data.defense : 5;
+                int sp = data != null ? data.spellPower : 5;
+                int kn = data != null ? data.knowledge : 5;
+                string hName = data != null ? data.heroName : "Player 2 Hero";
+                Sprite portrait = data != null ? data.heroPortrait : null;
+
+                p2Hero.SetStats(att, def, sp, kn, hName, portrait, 2);
 
                 var view = p2Obj.AddComponent<Heroes.Hero3DView>();
-                view.SetupHeroVisual(null, lookRight: false);
+                GameObject customPrefab = data != null ? data.heroPrefab : null;
+                view.SetupHeroVisual(customPrefab, lookRight: false);
             }
 
             // Assign HeroOwner to all placed & scene creature stacks

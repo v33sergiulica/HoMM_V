@@ -109,7 +109,22 @@ namespace HommClone.World
 
             if (_statsText != null)
             {
-                _statsText.text = $"<color=#FF6666><b>Attack:</b></color> {data.attack}    <color=#66AAFF><b>Defense:</b></color> {data.defense}\n<color=#CC66FF><b>Spell Power:</b></color> {data.spellPower}    <color=#FFCC00><b>Knowledge:</b></color> {data.knowledge}";
+                string secSkillsFormatted = "";
+                if (data.secondarySkills != null && data.secondarySkills.Count > 0)
+                {
+                    List<string> skillList = new List<string>();
+                    foreach (var s in data.secondarySkills)
+                    {
+                        skillList.Add($"{s.GetDisplayName()}");
+                    }
+                    secSkillsFormatted = $"\n<color=#FFFF88><b>Skills:</b></color> {string.Join(", ", skillList)}";
+                }
+                else
+                {
+                    secSkillsFormatted = "\n<color=#FFFF88><b>Skills:</b></color> None";
+                }
+
+                _statsText.text = $"<color=#FFD700><b>Level {data.level}</b></color> | XP: <b>{data.currentXP} / {data.xpToNextLevel}</b>\n<color=#FF6666><b>Attack:</b></color> {data.attack}    <color=#66AAFF><b>Defense:</b></color> {data.defense}    <color=#CC66FF><b>Power:</b></color> {data.spellPower}    <color=#FFCC00><b>Knowledge:</b></color> {data.knowledge}{secSkillsFormatted}";
             }
 
             if (_mpText != null)
