@@ -24,6 +24,7 @@ namespace HommClone.World
         private TextMeshProUGUI _mpText;
         private Image _mpBarFill;
         private GameObject _skillTreeBtnObj;
+        private GameObject _equipmentBtnObj;
 
         private List<Image> _armySlotIcons = new List<Image>();
         private List<TextMeshProUGUI> _armySlotCountTexts = new List<TextMeshProUGUI>();
@@ -164,6 +165,10 @@ namespace HommClone.World
             if (_skillTreeBtnObj != null)
             {
                 _skillTreeBtnObj.SetActive(!isEnemyHero);
+            }
+            if (_equipmentBtnObj != null)
+            {
+                _equipmentBtnObj.SetActive(!isEnemyHero);
             }
 
             if (isEnemyHero && _heroNameText != null)
@@ -346,6 +351,39 @@ namespace HommClone.World
             xRect.offsetMin = Vector2.zero;
             xRect.offsetMax = Vector2.zero;
 
+            // Artifact Equipment Modal Launch Button
+            _equipmentBtnObj = new GameObject("EquipmentBtn");
+            _equipmentBtnObj.transform.SetParent(innerPanel.transform, false);
+            RectTransform eqRect = _equipmentBtnObj.AddComponent<RectTransform>();
+            eqRect.anchorMin = new Vector2(0.45f, 0.88f);
+            eqRect.anchorMax = new Vector2(0.66f, 0.96f);
+            eqRect.offsetMin = Vector2.zero;
+            eqRect.offsetMax = Vector2.zero;
+            Image eqImg = _equipmentBtnObj.AddComponent<Image>();
+            eqImg.color = new Color(0.65f, 0.45f, 0.15f);
+            Button eqBtn = _equipmentBtnObj.AddComponent<Button>();
+            eqBtn.onClick.AddListener(() =>
+            {
+                if (_cachedHeroData != null)
+                {
+                    HideWindow();
+                    UI.HeroEquipmentUI.GetOrCreateInstance().Show(_cachedHeroData);
+                }
+            });
+
+            GameObject eqTxt = new GameObject("Text");
+            eqTxt.transform.SetParent(_equipmentBtnObj.transform, false);
+            var eTxt = eqTxt.AddComponent<TextMeshProUGUI>();
+            eTxt.text = "<b>[ARTIFACTS]</b>";
+            eTxt.alignment = TextAlignmentOptions.Center;
+            eTxt.fontSize = 11;
+            eTxt.color = Color.white;
+            RectTransform eRect = eqTxt.GetComponent<RectTransform>();
+            eRect.anchorMin = Vector2.zero;
+            eRect.anchorMax = Vector2.one;
+            eRect.offsetMin = Vector2.zero;
+            eRect.offsetMax = Vector2.zero;
+
             // Skill Tree Modal Launch Button
             _skillTreeBtnObj = new GameObject("SkillTreeBtn");
             _skillTreeBtnObj.transform.SetParent(innerPanel.transform, false);
@@ -369,7 +407,7 @@ namespace HommClone.World
             GameObject stTxt = new GameObject("Text");
             stTxt.transform.SetParent(_skillTreeBtnObj.transform, false);
             var tTxt = stTxt.AddComponent<TextMeshProUGUI>();
-            tTxt.text = "<b>🌳 SKILLS</b>";
+            tTxt.text = "<b>[SKILLS]</b>";
             tTxt.alignment = TextAlignmentOptions.Center;
             tTxt.fontSize = 11;
             tTxt.color = Color.white;

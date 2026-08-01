@@ -62,6 +62,124 @@ namespace HommClone.World
         public int adventureSkillTokens = 1; // Starts with 1 token for initial customization!
         public List<string> unlockedAdventureSkills = new List<string>();
 
+        // Artifact Inventory & Equipment State
+        public List<HommClone.Artifacts.ArtifactData> equippedArtifacts = new List<HommClone.Artifacts.ArtifactData>();
+        public List<HommClone.Artifacts.ArtifactData> backpack = new List<HommClone.Artifacts.ArtifactData>();
+
+        public HommClone.Artifacts.ArtifactData GetEquippedInSlot(HommClone.Artifacts.ArtifactSlotType slotType)
+        {
+            return equippedArtifacts.Find(a => a != null && a.slotType == slotType);
+        }
+
+        public void EquipArtifact(HommClone.Artifacts.ArtifactData artifact)
+        {
+            if (artifact == null) return;
+            var existing = GetEquippedInSlot(artifact.slotType);
+            if (existing != null)
+            {
+                equippedArtifacts.Remove(existing);
+                if (!backpack.Contains(existing)) backpack.Add(existing);
+            }
+            if (backpack.Contains(artifact)) backpack.Remove(artifact);
+            equippedArtifacts.Add(artifact);
+        }
+
+        public void UnequipArtifact(HommClone.Artifacts.ArtifactData artifact)
+        {
+            if (artifact == null) return;
+            if (equippedArtifacts.Contains(artifact))
+            {
+                equippedArtifacts.Remove(artifact);
+                if (!backpack.Contains(artifact)) backpack.Add(artifact);
+            }
+        }
+
+        public int GetTotalAttack()
+        {
+            int bonus = 0;
+            foreach (var a in equippedArtifacts) if (a != null) bonus += a.attackBonus;
+            foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.attackBonus;
+            return attack + bonus;
+        }
+
+        public int GetTotalDefense()
+        {
+            int bonus = 0;
+            foreach (var a in equippedArtifacts) if (a != null) bonus += a.defenseBonus;
+            foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.defenseBonus;
+            return defense + bonus;
+        }
+
+        public int GetTotalSpellPower()
+        {
+            int bonus = 0;
+            foreach (var a in equippedArtifacts) if (a != null) bonus += a.spellPowerBonus;
+            foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.spellPowerBonus;
+            return spellPower + bonus;
+        }
+
+        public int GetTotalKnowledge()
+        {
+            int bonus = 0;
+            foreach (var a in equippedArtifacts) if (a != null) bonus += a.knowledgeBonus;
+            foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.knowledgeBonus;
+            return knowledge + bonus;
+        }
+
+        public int GetTotalMorale()
+        {
+            int bonus = 0;
+            foreach (var a in equippedArtifacts) if (a != null) bonus += a.moraleBonus;
+            foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.moraleBonus;
+            return bonus;
+        }
+
+        public int GetTotalLuck()
+        {
+            int bonus = 0;
+            foreach (var a in equippedArtifacts) if (a != null) bonus += a.luckBonus;
+            foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.luckBonus;
+            return bonus;
+        }
+
+        public int GetMaxMana()
+        {
+            return GetTotalKnowledge() * 10;
+        }
+
+        public List<HommClone.Artifacts.ArtifactSetRequirement> GetActiveSetBonuses()
+        {
+            List<HommClone.Artifacts.ArtifactSetRequirement> activeBonuses = new List<HommClone.Artifacts.ArtifactSetRequirement>();
+            var allSets = HommClone.Artifacts.ArtifactCatalog.GetAllSets();
+
+            foreach (var setData in allSets)
+            {
+                int equippedCount = 0;
+                foreach (var a in equippedArtifacts)
+                {
+                    if (a != null && a.setId == setData.setId) equippedCount++;
+                }
+
+                // Pick ONLY the highest matching set bonus tier (e.g. 3/3 overrides 2/3)
+                HommClone.Artifacts.ArtifactSetRequirement highestBonus = null;
+                foreach (var req in setData.setBonuses)
+                {
+                    if (equippedCount >= req.requiredPieces)
+                    {
+                        if (highestBonus == null || req.requiredPieces > highestBonus.requiredPieces)
+                        {
+                            highestBonus = req;
+                        }
+                    }
+                }
+                if (highestBonus != null)
+                {
+                    activeBonuses.Add(highestBonus);
+                }
+            }
+            return activeBonuses;
+        }
+
         public float GetLogisticsBonus()
         {
             if (unlockedAdventureSkills.Contains("logistics_3")) return 0.30f;
@@ -266,6 +384,29 @@ namespace HommClone.World
 
             if (player1Hero.unlockedAdventureSkills == null) player1Hero.unlockedAdventureSkills = new List<string>();
             if (player2Hero.unlockedAdventureSkills == null) player2Hero.unlockedAdventureSkills = new List<string>();
+
+            if (player1Hero.equippedArtifacts == null) player1Hero.equippedArtifacts = new List<HommClone.Artifacts.ArtifactData>();
+            if (player1Hero.backpack == null) player1Hero.backpack = new List<HommClone.Artifacts.ArtifactData>();
+            if (player2Hero.equippedArtifacts == null) player2Hero.equippedArtifacts = new List<HommClone.Artifacts.ArtifactData>();
+            if (player2Hero.backpack == null) player2Hero.backpack = new List<HommClone.Artifacts.ArtifactData>();
+
+            // Give starter artifacts for testing equipment and set bonuses
+            if (player1Hero.backpack.Count == 0 && player1Hero.equippedArtifacts.Count == 0)
+            {
+                player1Hero.EquipArtifact(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("sword_might"));
+                player1Hero.EquipArtifact(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("shield_dead"));
+                player1Hero.backpack.Add(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("boots_speed"));
+                player1Hero.backpack.Add(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("lion_blade"));
+                player1Hero.backpack.Add(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("lion_armor"));
+                player1Hero.backpack.Add(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("lion_helm"));
+            }
+
+            if (player2Hero.backpack.Count == 0 && player2Hero.equippedArtifacts.Count == 0)
+            {
+                player2Hero.EquipArtifact(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("staff_magius"));
+                player2Hero.EquipArtifact(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("crown_knowledge"));
+                player2Hero.backpack.Add(HommClone.Artifacts.ArtifactCatalog.GetArtifactById("amulet_life"));
+            }
 
             // Only initialize default army if army list is completely empty
             if (player1Hero.army.Count == 0)

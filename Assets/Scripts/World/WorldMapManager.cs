@@ -80,30 +80,31 @@ namespace HommClone.World
             WorldHero p1Hero = null;
             WorldHero p2Hero = null;
 
-            if (heroes != null && heroes.Length >= 2)
+            if (heroes != null && heroes.Length > 0)
             {
+                // Sort heroes deterministically by grid distance to (0,0) so Player 1 and Player 2 are never inverted!
+                System.Array.Sort(heroes, (a, b) =>
+                {
+                    int distA = a.GridPosition.x + a.GridPosition.y;
+                    int distB = b.GridPosition.x + b.GridPosition.y;
+                    return distA.CompareTo(distB);
+                });
+
                 p1Hero = heroes[0];
                 p1Hero.SetPlayerIndexAndPosition(1, p1Hero.GridPosition != Vector2Int.zero ? p1Hero.GridPosition : new Vector2Int(2, 2));
 
-                p2Hero = heroes[1];
-                p2Hero.SetPlayerIndexAndPosition(2, p2Hero.GridPosition != Vector2Int.zero ? p2Hero.GridPosition : new Vector2Int(18, 18));
+                if (heroes.Length >= 2)
+                {
+                    p2Hero = heroes[1];
+                    p2Hero.SetPlayerIndexAndPosition(2, p2Hero.GridPosition != Vector2Int.zero ? p2Hero.GridPosition : new Vector2Int(18, 18));
+                }
             }
-            else
-            {
-                p1Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 1);
-                if (p1Hero == null && heroes != null && heroes.Length > 0)
-                {
-                    p1Hero = heroes[0];
-                    p1Hero.SetPlayerIndexAndPosition(1, new Vector2Int(2, 2));
-                }
 
-                p2Hero = System.Array.Find(heroes, h => h != null && h.PlayerIndex == 2);
-                if (p2Hero == null)
-                {
-                    GameObject obj = new GameObject("WorldHero_Player2");
-                    p2Hero = obj.AddComponent<WorldHero>();
-                    p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
-                }
+            if (p2Hero == null)
+            {
+                GameObject obj = new GameObject("WorldHero_Player2");
+                p2Hero = obj.AddComponent<WorldHero>();
+                p2Hero.SetPlayerIndexAndPosition(2, new Vector2Int(18, 18));
             }
 
             if (manager != null)

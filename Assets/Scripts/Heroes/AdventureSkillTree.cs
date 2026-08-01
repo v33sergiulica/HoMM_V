@@ -37,17 +37,17 @@ namespace HommClone.Heroes
                 _nodes = new List<AdventureSkillNode>
                 {
                     // Row 0: Logistics Branch
-                    new AdventureSkillNode("logistics_1", "Logistics 1", "+10% movement on map grid", "👟", 1, null, new Vector2Int(0, 0)),
-                    new AdventureSkillNode("logistics_2", "Logistics 2", "+20% movement on map grid", "👟", 2, "logistics_1", new Vector2Int(1, 0)),
-                    new AdventureSkillNode("logistics_3", "Logistics 3", "+30% movement on map grid", "👑", 3, "logistics_2", new Vector2Int(2, 0)),
+                    new AdventureSkillNode("logistics_1", "Logistics 1", "+10% movement on map grid", "[Move I]", 1, null, new Vector2Int(0, 0)),
+                    new AdventureSkillNode("logistics_2", "Logistics 2", "+20% movement on map grid", "[Move II]", 2, "logistics_1", new Vector2Int(1, 0)),
+                    new AdventureSkillNode("logistics_3", "Logistics 3", "+30% movement on map grid", "[Crown]", 3, "logistics_2", new Vector2Int(2, 0)),
 
                     // Row 1: PathFinding Branch
-                    new AdventureSkillNode("pathfinding_1", "PathFinding 1", "-50% reduction for going through rough terrain", "🌾", 1, null, new Vector2Int(0, 1)),
-                    new AdventureSkillNode("pathfinding_2", "PathFinding 2", "-100% reduction for going through rough terrain", "🌾", 2, "pathfinding_1", new Vector2Int(1, 1)),
+                    new AdventureSkillNode("pathfinding_1", "PathFinding 1", "-50% reduction for going through rough terrain", "[Path I]", 1, null, new Vector2Int(0, 1)),
+                    new AdventureSkillNode("pathfinding_2", "PathFinding 2", "-100% reduction for going through rough terrain", "[Path II]", 2, "pathfinding_1", new Vector2Int(1, 1)),
 
                     // Row 2: Scouting & Stealth Branch
-                    new AdventureSkillNode("scouting", "Scouting", "See exact troop counts in monster stacks & enemy hero armies.", "👁️", 1, null, new Vector2Int(0, 2)),
-                    new AdventureSkillNode("stealth", "Stealth", "(Not Working Currently) Opposing heroes cannot see your real army.", "🥷", 2, "scouting", new Vector2Int(1, 2))
+                    new AdventureSkillNode("scouting", "Scouting", "See exact troop counts in monster stacks & enemy hero armies.", "[Scout]", 1, null, new Vector2Int(0, 2)),
+                    new AdventureSkillNode("stealth", "Stealth", "(Not Working Currently) Opposing heroes cannot see your real army.", "[Stealth]", 2, "scouting", new Vector2Int(1, 2))
                 };
             }
             return _nodes;
