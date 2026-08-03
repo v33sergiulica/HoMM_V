@@ -640,6 +640,8 @@ namespace HommClone.UI
             }
         }
 
+        private int _selectedSpellTab = 0; // 0 = ALL, 1 = LIGHT, 2 = DARK, 3 = DESTRUCTIVE
+
         public void ShowSpellBook()
         {
             if (_turnManager == null || _turnManager.ActiveUnit == null) return;
@@ -648,12 +650,16 @@ namespace HommClone.UI
             List<Spell> spells = null;
             int currentMana = 0;
             int maxMana = 0;
+            HommClone.World.HeroData heroData = null;
 
             if (active is Heroes.Hero hero)
             {
                 spells = hero.Spells;
                 currentMana = hero.CurrentMana;
                 maxMana = hero.MaxMana;
+
+                var gdm = HommClone.World.GameDataManager.Instance;
+                if (gdm != null) heroData = (hero.PlayerIndex == 1) ? gdm.player1Hero : gdm.player2Hero;
             }
             else if (active is CreatureStack stack)
             {
@@ -664,7 +670,7 @@ namespace HommClone.UI
 
             if (spells == null || spells.Count == 0 || maxMana == 0) return;
 
-            // Recreate or enable panel
+            // Create or update panel
             if (_spellBookPanel == null)
             {
                 _spellBookPanel = new GameObject("SpellBookPanel");
@@ -673,100 +679,224 @@ namespace HommClone.UI
                 rect.anchorMin = new Vector2(0.5f, 0.5f);
                 rect.anchorMax = new Vector2(0.5f, 0.5f);
                 rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.sizeDelta = new Vector2(320f, 240f);
+                rect.sizeDelta = new Vector2(520f, 420f);
 
                 Image bg = _spellBookPanel.AddComponent<Image>();
-                bg.color = new Color(0.1f, 0.1f, 0.1f, 0.95f); // Charcoal dark glass
+                bg.color = new Color(0.08f, 0.08f, 0.12f, 0.96f); // Rich dark metallic obsidian
 
                 Outline border = _spellBookPanel.AddComponent<Outline>();
-                border.effectColor = new Color(0.6f, 0.5f, 0.3f, 0.8f); // Golden/Bronze book outline
-                border.effectDistance = new Vector2(2f, 2f);
+                border.effectColor = new Color(0.85f, 0.7f, 0.25f, 0.9f); // Bright Gold border
+                border.effectDistance = new Vector2(2.5f, 2.5f);
             }
 
             _spellBookPanel.SetActive(true);
 
-            // Destroy old content of spell list
+            // Destroy old content
             foreach (Transform child in _spellBookPanel.transform)
             {
-                if (child.gameObject.name != "Title" && child.gameObject.name != "CloseButton")
-                {
-                    Destroy(child.gameObject);
-                }
+                Destroy(child.gameObject);
             }
 
-            // Create Title
-            GameObject titleObj = _spellBookPanel.transform.Find("Title")?.gameObject;
-            if (titleObj == null)
+            // 1. Header Title & Mana
+            GameObject headerObj = new GameObject("Header");
+            headerObj.transform.SetParent(_spellBookPanel.transform, false);
+            RectTransform headerRect = headerObj.AddComponent<RectTransform>();
+            headerRect.anchorMin = new Vector2(0f, 1f);
+            headerRect.anchorMax = new Vector2(1f, 1f);
+            headerRect.pivot = new Vector2(0.5f, 1f);
+            headerRect.anchoredPosition = new Vector2(0f, -10f);
+            headerRect.sizeDelta = new Vector2(0f, 45f);
+
+            TextMeshProUGUI headerTxt = headerObj.AddComponent<TextMeshProUGUI>();
+            headerTxt.alignment = TextAlignmentOptions.Center;
+            headerTxt.fontSize = 17;
+            headerTxt.color = new Color(1f, 0.9f, 0.5f, 1f);
+            headerTxt.text = $"<b>GRIMOIRE & SPELLBOOK</b>   <size=75%>(<color=#55CCFF>Mana: {currentMana} / {maxMana}</color>)</size>";
+
+            // 2. Magic School Tabs Container
+            GameObject tabsObj = new GameObject("TabsContainer");
+            tabsObj.transform.SetParent(_spellBookPanel.transform, false);
+            RectTransform tabsRect = tabsObj.AddComponent<RectTransform>();
+            tabsRect.anchorMin = new Vector2(0f, 1f);
+            tabsRect.anchorMax = new Vector2(1f, 1f);
+            tabsRect.pivot = new Vector2(0.5f, 1f);
+            tabsRect.anchoredPosition = new Vector2(0f, -55f);
+            tabsRect.sizeDelta = new Vector2(0f, 32f);
+
+            HorizontalLayoutGroup tabsLayout = tabsObj.AddComponent<HorizontalLayoutGroup>();
+            tabsLayout.spacing = 8f;
+            tabsLayout.childAlignment = TextAnchor.MiddleCenter;
+            tabsLayout.childControlWidth = true;
+            tabsLayout.childControlHeight = true;
+
+            string[] tabNames = new string[] { "ALL SPELLS", "LIGHT", "DARK", "DESTRUCTIVE" };
+            Color[] tabColors = new Color[] {
+                new Color(0.8f, 0.8f, 0.8f),
+                new Color(1f, 0.9f, 0.4f),
+                new Color(0.8f, 0.5f, 1f),
+                new Color(1f, 0.35f, 0.35f)
+            };
+
+            for (int t = 0; t < tabNames.Length; t++)
             {
-                titleObj = new GameObject("Title");
-                titleObj.transform.SetParent(_spellBookPanel.transform, false);
-                TextMeshProUGUI titleTxt = titleObj.AddComponent<TextMeshProUGUI>();
-                titleTxt.alignment = TextAlignmentOptions.Center;
-                titleTxt.fontSize = 15;
-                titleTxt.color = new Color(0.9f, 0.8f, 0.6f, 1f); // Pale gold
+                int tabIdx = t;
+                GameObject tBtnObj = new GameObject($"Tab_{tabNames[t]}");
+                tBtnObj.transform.SetParent(tabsObj.transform, false);
 
-                RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-                titleRect.anchorMin = new Vector2(0f, 1f);
-                titleRect.anchorMax = new Vector2(1f, 1f);
-                titleRect.pivot = new Vector2(0.5f, 1f);
-                titleRect.anchoredPosition = new Vector2(0f, -12f);
-                titleRect.sizeDelta = new Vector2(0f, 40f);
+                Image tImg = tBtnObj.AddComponent<Image>();
+                bool isSelected = (_selectedSpellTab == tabIdx);
+                tImg.color = isSelected ? tabColors[t] * 0.4f + new Color(0.2f, 0.2f, 0.2f, 0.8f) : new Color(0.12f, 0.12f, 0.15f, 0.9f);
+
+                Outline tBorder = tBtnObj.AddComponent<Outline>();
+                tBorder.effectColor = isSelected ? tabColors[t] : new Color(0.3f, 0.3f, 0.3f, 0.5f);
+                tBorder.effectDistance = new Vector2(1.5f, 1.5f);
+
+                Button tBtn = tBtnObj.AddComponent<Button>();
+                tBtn.onClick.AddListener(() =>
+                {
+                    _selectedSpellTab = tabIdx;
+                    ShowSpellBook();
+                });
+
+                GameObject tLblObj = new GameObject("Label");
+                tLblObj.transform.SetParent(tBtnObj.transform, false);
+                TextMeshProUGUI tLbl = tLblObj.AddComponent<TextMeshProUGUI>();
+                tLbl.alignment = TextAlignmentOptions.Center;
+                tLbl.fontSize = 11;
+                tLbl.color = isSelected ? tabColors[t] : new Color(0.7f, 0.7f, 0.7f);
+                tLbl.text = $"<b>{tabNames[t]}</b>";
+
+                RectTransform tLblRect = tLblObj.GetComponent<RectTransform>();
+                tLblRect.anchorMin = Vector2.zero;
+                tLblRect.anchorMax = Vector2.one;
+                tLblRect.sizeDelta = Vector2.zero;
             }
-            titleObj.GetComponent<TextMeshProUGUI>().text = $"<b>SPELL BOOK</b>\n<size=80%>Mana: {currentMana} / {maxMana}</size>";
 
-            // Create Spells Grid container
+            // 3. Spells Grid Container
             GameObject gridObj = new GameObject("SpellsGrid");
             gridObj.transform.SetParent(_spellBookPanel.transform, false);
             RectTransform gridRect = gridObj.AddComponent<RectTransform>();
             gridRect.anchorMin = new Vector2(0f, 0f);
             gridRect.anchorMax = new Vector2(1f, 1f);
-            gridRect.offsetMin = new Vector2(15f, 45f); // padding bottom
-            gridRect.offsetMax = new Vector2(-15f, -60f); // padding top
+            gridRect.offsetMin = new Vector2(15f, 45f);
+            gridRect.offsetMax = new Vector2(-15f, -95f);
 
             GridLayoutGroup grid = gridObj.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(135f, 40f);
-            grid.spacing = new Vector2(12f, 8f);
+            grid.cellSize = new Vector2(235f, 65f);
+            grid.spacing = new Vector2(12f, 10f);
             grid.startAxis = GridLayoutGroup.Axis.Horizontal;
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 2;
 
-            // Instantiate spell buttons
-            foreach (var spell in spells)
+            // Filter Spells by selected tab
+            List<Spell> filteredSpells = new List<Spell>();
+            foreach (var s in spells)
             {
-                if (spell == null) continue;
-                
+                if (s == null) continue;
+                if (_selectedSpellTab == 0) filteredSpells.Add(s);
+                else if (_selectedSpellTab == 1 && s.School == MagicSchool.Light) filteredSpells.Add(s);
+                else if (_selectedSpellTab == 2 && s.School == MagicSchool.Dark) filteredSpells.Add(s);
+                else if (_selectedSpellTab == 3 && s.School == MagicSchool.Destructive) filteredSpells.Add(s);
+            }
+
+            foreach (var spell in filteredSpells)
+            {
                 GameObject btnObj = new GameObject($"Spell_{spell.SpellName}");
                 btnObj.transform.SetParent(gridObj.transform, false);
 
                 Image img = btnObj.AddComponent<Image>();
-                img.color = new Color(0.16f, 0.16f, 0.16f, 1f);
+                img.color = new Color(0.12f, 0.12f, 0.16f, 0.95f);
+
+                Color schoolColor = (spell.School == MagicSchool.Light) ? new Color(1f, 0.85f, 0.3f) :
+                                   (spell.School == MagicSchool.Dark) ? new Color(0.75f, 0.45f, 1f) :
+                                                                         new Color(1f, 0.35f, 0.35f);
+
+                Outline sOutline = btnObj.AddComponent<Outline>();
+                sOutline.effectColor = schoolColor * 0.7f;
+                sOutline.effectDistance = new Vector2(1.5f, 1.5f);
 
                 Button btn = btnObj.AddComponent<Button>();
                 ColorBlock cb = btn.colors;
-                cb.normalColor = new Color(0.2f, 0.2f, 0.2f, 1f);
-                cb.highlightedColor = new Color(0.3f, 0.35f, 0.4f, 1f);
-                cb.pressedColor = new Color(0.12f, 0.14f, 0.16f, 1f);
+                cb.normalColor = new Color(0.14f, 0.14f, 0.18f, 1f);
+                cb.highlightedColor = new Color(0.24f, 0.24f, 0.32f, 1f);
+                cb.pressedColor = new Color(0.09f, 0.09f, 0.12f, 1f);
                 cb.disabledColor = new Color(0.08f, 0.08f, 0.08f, 0.5f);
                 btn.colors = cb;
+
+                // 1. Icon Container Frame (Left 50x50 px)
+                GameObject iconFrameObj = new GameObject("IconFrame");
+                iconFrameObj.transform.SetParent(btnObj.transform, false);
+                RectTransform iconFrameRect = iconFrameObj.AddComponent<RectTransform>();
+                iconFrameRect.anchorMin = new Vector2(0f, 0.5f);
+                iconFrameRect.anchorMax = new Vector2(0f, 0.5f);
+                iconFrameRect.pivot = new Vector2(0f, 0.5f);
+                iconFrameRect.anchoredPosition = new Vector2(7f, 0f);
+                iconFrameRect.sizeDelta = new Vector2(50f, 50f);
+
+                Image iconFrameBg = iconFrameObj.AddComponent<Image>();
+                iconFrameBg.color = new Color(0.06f, 0.06f, 0.09f, 1f);
+
+                Outline iconBorder = iconFrameObj.AddComponent<Outline>();
+                iconBorder.effectColor = schoolColor;
+                iconBorder.effectDistance = new Vector2(1f, 1f);
+
+                // Spell Icon Image
+                GameObject iconImgObj = new GameObject("SpellIcon");
+                iconImgObj.transform.SetParent(iconFrameObj.transform, false);
+                RectTransform iconImgRect = iconImgObj.AddComponent<RectTransform>();
+                iconImgRect.anchorMin = Vector2.zero;
+                iconImgRect.anchorMax = Vector2.one;
+                iconImgRect.sizeDelta = Vector2.zero;
+
+                Image iconImg = iconImgObj.AddComponent<Image>();
+                if (spell.Icon != null)
+                {
+                    iconImg.sprite = spell.Icon;
+                    iconImg.color = Color.white;
+                }
+                else
+                {
+                    // Fallback visual badge with school color tint & spell initials
+                    iconImg.color = schoolColor * 0.4f + new Color(0.2f, 0.2f, 0.2f, 0.8f);
+
+                    GameObject initObj = new GameObject("Initials");
+                    initObj.transform.SetParent(iconImgObj.transform, false);
+                    TextMeshProUGUI initTxt = initObj.AddComponent<TextMeshProUGUI>();
+                    initTxt.alignment = TextAlignmentOptions.Center;
+                    initTxt.fontSize = 16;
+                    initTxt.color = schoolColor;
+                    string initials = spell.SpellName.Length >= 2 ? spell.SpellName.Substring(0, 2).ToUpper() : "SP";
+                    initTxt.text = $"<b>{initials}</b>";
+
+                    RectTransform initRect = initObj.GetComponent<RectTransform>();
+                    initRect.anchorMin = Vector2.zero;
+                    initRect.anchorMax = Vector2.one;
+                    initRect.sizeDelta = Vector2.zero;
+                }
+
+                // 2. Spell Info Label (Right side)
+                SpellMastery mastery = heroData != null ? heroData.GetSchoolMastery(spell.School) : SpellMastery.Basic;
+                string schoolHex = ColorUtility.ToHtmlStringRGB(schoolColor);
 
                 GameObject lblObj = new GameObject("Label");
                 lblObj.transform.SetParent(btnObj.transform, false);
                 TextMeshProUGUI lbl = lblObj.AddComponent<TextMeshProUGUI>();
-                lbl.alignment = TextAlignmentOptions.Center;
+                lbl.alignment = TextAlignmentOptions.Left;
                 lbl.fontSize = 11;
                 lbl.color = Color.white;
-                lbl.text = $"<b>{spell.SpellName}</b>\n<size=80%>{spell.ManaCost} Mana</size>";
+                lbl.text = $"<b>{spell.SpellName}</b> <color=#{schoolHex}><size=80%>[{spell.School}]</size></color>\n<size=85%>Cost: <color=#55CCFF><b>{spell.ManaCost} MP</b></color> | Rank: <color=#FFCC00>{mastery}</color></size>";
 
                 RectTransform lblRect = lblObj.GetComponent<RectTransform>();
                 lblRect.anchorMin = Vector2.zero;
                 lblRect.anchorMax = Vector2.one;
-                lblRect.sizeDelta = Vector2.zero;
+                lblRect.offsetMin = new Vector2(64f, 4f); // Shifted right past the 50px icon frame
+                lblRect.offsetMax = new Vector2(-6f, -4f);
 
-                // Disable if not enough mana
                 if (currentMana < spell.ManaCost)
                 {
                     btn.interactable = false;
                     lbl.color = new Color(1f, 1f, 1f, 0.4f);
+                    if (iconImg != null) iconImg.color = new Color(iconImg.color.r, iconImg.color.g, iconImg.color.b, 0.4f);
                 }
                 else
                 {
@@ -782,38 +912,38 @@ namespace HommClone.UI
                 }
             }
 
-            // Create Close button at bottom
-            GameObject closeObj = _spellBookPanel.transform.Find("CloseButton")?.gameObject;
-            if (closeObj == null)
-            {
-                closeObj = new GameObject("CloseButton");
-                closeObj.transform.SetParent(_spellBookPanel.transform, false);
-                RectTransform closeRect = closeObj.AddComponent<RectTransform>();
-                closeRect.anchorMin = new Vector2(0.5f, 0f);
-                closeRect.anchorMax = new Vector2(0.5f, 0f);
-                closeRect.pivot = new Vector2(0.5f, 0f);
-                closeRect.anchoredPosition = new Vector2(0f, 10f);
-                closeRect.sizeDelta = new Vector2(100f, 25f);
+            // 4. Close Button
+            GameObject closeObj = new GameObject("CloseButton");
+            closeObj.transform.SetParent(_spellBookPanel.transform, false);
+            RectTransform closeRect = closeObj.AddComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(0.5f, 0f);
+            closeRect.anchorMax = new Vector2(0.5f, 0f);
+            closeRect.pivot = new Vector2(0.5f, 0f);
+            closeRect.anchoredPosition = new Vector2(0f, 10f);
+            closeRect.sizeDelta = new Vector2(130f, 30f);
 
-                Image closeImg = closeObj.AddComponent<Image>();
-                closeImg.color = new Color(0.25f, 0.12f, 0.12f, 1f); // Dark reddish close button
+            Image closeImg = closeObj.AddComponent<Image>();
+            closeImg.color = new Color(0.35f, 0.12f, 0.12f, 0.95f);
 
-                Button closeBtn = closeObj.AddComponent<Button>();
-                closeBtn.onClick.AddListener(() => HideSpellBook());
+            Outline closeBorder = closeObj.AddComponent<Outline>();
+            closeBorder.effectColor = new Color(0.8f, 0.3f, 0.3f, 0.8f);
+            closeBorder.effectDistance = new Vector2(1.5f, 1.5f);
 
-                GameObject closeLblObj = new GameObject("Label");
-                closeLblObj.transform.SetParent(closeObj.transform, false);
-                TextMeshProUGUI closeLbl = closeLblObj.AddComponent<TextMeshProUGUI>();
-                closeLbl.alignment = TextAlignmentOptions.Center;
-                closeLbl.fontSize = 11;
-                closeLbl.color = Color.white;
-                closeLbl.text = "<b>CLOSE</b>";
+            Button closeBtn = closeObj.AddComponent<Button>();
+            closeBtn.onClick.AddListener(() => HideSpellBook());
 
-                RectTransform closeLblRect = closeLblObj.GetComponent<RectTransform>();
-                closeLblRect.anchorMin = Vector2.zero;
-                closeLblRect.anchorMax = Vector2.one;
-                closeLblRect.sizeDelta = Vector2.zero;
-            }
+            GameObject closeLblObj = new GameObject("Label");
+            closeLblObj.transform.SetParent(closeObj.transform, false);
+            TextMeshProUGUI closeLbl = closeLblObj.AddComponent<TextMeshProUGUI>();
+            closeLbl.alignment = TextAlignmentOptions.Center;
+            closeLbl.fontSize = 12;
+            closeLbl.color = Color.white;
+            closeLbl.text = "<b>CLOSE SPELLBOOK</b>";
+
+            RectTransform closeLblRect = closeLblObj.GetComponent<RectTransform>();
+            closeLblRect.anchorMin = Vector2.zero;
+            closeLblRect.anchorMax = Vector2.one;
+            closeLblRect.sizeDelta = Vector2.zero;
         }
 
         public void HideUnitInfoPanel()
@@ -831,95 +961,40 @@ namespace HommClone.UI
             // Close spellbook first
             HideSpellBook();
 
+            if (_unitInfoPanel != null && _unitInfoPanel.transform.Find("InnerPanel") == null)
+            {
+                Destroy(_unitInfoPanel);
+                _unitInfoPanel = null;
+            }
+
             if (_unitInfoPanel == null)
             {
-                // Create root panel
-                _unitInfoPanel = new GameObject("UnitInfoPanel");
-                _unitInfoPanel.transform.SetParent(_canvasObj.transform, false);
-
-                RectTransform rect = _unitInfoPanel.AddComponent<RectTransform>();
-                rect.anchorMin = new Vector2(0.5f, 0.5f);
-                rect.anchorMax = new Vector2(0.5f, 0.5f);
-                rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.anchoredPosition = Vector2.zero;
-                rect.sizeDelta = new Vector2(400f, 320f); // Sleek medium box
-
-                Image bg = _unitInfoPanel.AddComponent<Image>();
-                bg.color = new Color(0.12f, 0.12f, 0.14f, 0.95f); // Elegant dark slate gray
-
-                // Border/outline
-                Outline outline = _unitInfoPanel.AddComponent<Outline>();
-                outline.effectColor = activeFrameColor;
-                outline.effectDistance = new Vector2(2f, 2f);
-
-                // Add Title text
-                GameObject titleObj = new GameObject("TitleText");
-                titleObj.transform.SetParent(_unitInfoPanel.transform, false);
-                TextMeshProUGUI titleText = titleObj.AddComponent<TextMeshProUGUI>();
-                titleText.alignment = TextAlignmentOptions.Top;
-                titleText.fontSize = 18;
-                titleText.fontStyle = FontStyles.Bold;
-                titleText.color = Color.yellow;
-                
-                RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-                titleRect.anchorMin = new Vector2(0f, 1f);
-                titleRect.anchorMax = new Vector2(1f, 1f);
-                titleRect.pivot = new Vector2(0.5f, 1f);
-                titleRect.anchoredPosition = new Vector2(0f, -10f);
-                titleRect.sizeDelta = new Vector2(-20f, 30f);
-
-                // Add Stats text block
-                GameObject statsObj = new GameObject("StatsText");
-                statsObj.transform.SetParent(_unitInfoPanel.transform, false);
-                TextMeshProUGUI statsText = statsObj.AddComponent<TextMeshProUGUI>();
-                statsText.alignment = TextAlignmentOptions.TopLeft;
-                statsText.fontSize = 13;
-                statsText.color = Color.white;
-
-                RectTransform statsRect = statsObj.GetComponent<RectTransform>();
-                statsRect.anchorMin = Vector2.zero;
-                statsRect.anchorMax = Vector2.one;
-                statsRect.offsetMin = new Vector2(15f, 50f); // padding left & bottom for close button
-                statsRect.offsetMax = new Vector2(-15f, -45f); // padding right & top
-
-                // Add Close button at bottom
-                GameObject closeObj = new GameObject("CloseButton");
-                closeObj.transform.SetParent(_unitInfoPanel.transform, false);
-                RectTransform closeRect = closeObj.AddComponent<RectTransform>();
-                closeRect.anchorMin = new Vector2(0.5f, 0f);
-                closeRect.anchorMax = new Vector2(0.5f, 0f);
-                closeRect.pivot = new Vector2(0.5f, 0f);
-                closeRect.anchoredPosition = new Vector2(0f, 12f);
-                closeRect.sizeDelta = new Vector2(100f, 28f);
-
-                Image closeImg = closeObj.AddComponent<Image>();
-                closeImg.color = new Color(0.3f, 0.15f, 0.15f, 1f);
-
-                Button closeBtn = closeObj.AddComponent<Button>();
-                closeBtn.onClick.AddListener(() => HideUnitInfoPanel());
-
-                GameObject closeLblObj = new GameObject("Label");
-                closeLblObj.transform.SetParent(closeObj.transform, false);
-                TextMeshProUGUI closeLbl = closeLblObj.AddComponent<TextMeshProUGUI>();
-                closeLbl.alignment = TextAlignmentOptions.Center;
-                closeLbl.fontSize = 11;
-                closeLbl.fontStyle = FontStyles.Bold;
-                closeLbl.color = Color.white;
-                closeLbl.text = "CLOSE";
-
-                RectTransform closeLblRect = closeLblObj.GetComponent<RectTransform>();
-                closeLblRect.anchorMin = Vector2.zero;
-                closeLblRect.anchorMax = Vector2.one;
-                closeLblRect.sizeDelta = Vector2.zero;
+                CreateUnitInfoPanelUI();
             }
 
             _unitInfoPanel.SetActive(true);
 
-            // Populate Info text content
-            var title = _unitInfoPanel.transform.Find("TitleText").GetComponent<TextMeshProUGUI>();
-            title.text = $"<b>{stack.Name}</b> (Player {stack.PlayerIndex})";
+            // Populate Creature Icon
+            var iconImg = _unitInfoPanel.transform.Find("InnerPanel/IconFrame/CreatureIcon")?.GetComponent<Image>();
+            if (iconImg != null)
+            {
+                if (stack.Data.Icon != null)
+                {
+                    iconImg.gameObject.SetActive(true);
+                    iconImg.sprite = stack.Data.Icon;
+                    iconImg.color = Color.white;
+                }
+                else
+                {
+                    iconImg.gameObject.SetActive(false);
+                }
+            }
 
-            var stats = _unitInfoPanel.transform.Find("StatsText").GetComponent<TextMeshProUGUI>();
+            // Populate Info text content
+            var title = _unitInfoPanel.transform.Find("InnerPanel/TitleText")?.GetComponent<TextMeshProUGUI>();
+            if (title != null) title.text = $"<b>{stack.Name}</b> <size=80%>(Player {stack.PlayerIndex})</size>";
+
+            var stats = _unitInfoPanel.transform.Find("InnerPanel/DetailsCard/StatsText")?.GetComponent<TextMeshProUGUI>();
 
             // Compile active status effects text description
             string effectsList = "";
@@ -937,20 +1012,28 @@ namespace HommClone.UI
                 effectsList = "<color=#888888>None</color>";
             }
 
-            // Piece together details
-            string infoString = "";
-            infoString += $"<b>Count:</b> {stack.Count}  |  <b>HP (Top Unit):</b> {stack.CurrentHealth}/{stack.Data.MaxHealth}\n";
-            infoString += $"<b>Attack:</b> {stack.Attack} (Base: {stack.Data.Attack})  |  <b>Defense:</b> {stack.Defense} (Base: {stack.Data.Defense})\n";
-            infoString += $"<b>Speed:</b> {stack.Speed} (Base: {stack.Data.Speed})  |  <b>Initiative:</b> {stack.Initiative:F1}\n";
-            
             // Highlight positive/negative Morale & Luck color
-            string moraleColor = stack.Morale > 0 ? "#44ff44" : (stack.Morale < 0 ? "#ff4444" : "#ffffff");
-            string luckColor = stack.Luck > 0 ? "#44ff44" : (stack.Luck < 0 ? "#ff4444" : "#ffffff");
-            
-            infoString += $"<b>Morale:</b> <color={moraleColor}>{stack.Morale}</color>  |  <b>Luck:</b> <color={luckColor}>{stack.Luck}</color>\n";
+            string moraleColor = stack.Morale > 0 ? "#44FF44" : (stack.Morale < 0 ? "#FF4444" : "#FFFFFF");
+            string luckColor = stack.Luck > 0 ? "#44FF44" : (stack.Luck < 0 ? "#FF4444" : "#FFFFFF");
+
+            string atkStr = stack.Attack != stack.Data.Attack ? $"{stack.Attack} <size=80%>(Base: {stack.Data.Attack})</size>" : $"{stack.Data.Attack}";
+            string defStr = stack.Defense != stack.Data.Defense ? $"{stack.Defense} <size=80%>(Base: {stack.Data.Defense})</size>" : $"{stack.Data.Defense}";
+            string speedStr = stack.Speed != stack.Data.Speed ? $"{stack.Speed} <size=80%>(Base: {stack.Data.Speed})</size>" : $"{stack.Data.Speed}";
+
+            // Piece together details VERTICALLY (each attribute with distinct professional colors)
+            string infoString = "";
+            infoString += $"<color=#FFD700><b>Count:</b></color> <color=#FFF0A0><b>{stack.Count}</b></color>\n";
+            infoString += $"<color=#55FF66><b>HP (Top Unit):</b></color> <color=#AAFFAA>{stack.CurrentHealth}/{stack.Data.MaxHealth}</color>\n";
+            infoString += $"<color=#FF5555><b>Attack:</b></color> <color=#FF9999>{atkStr}</color>\n";
+            infoString += $"<color=#44AAFF><b>Defense:</b></color> <color=#99CCFF>{defStr}</color>\n";
+            infoString += $"<color=#FF8844><b>Speed:</b></color> <color=#FFBB99>{speedStr}</color>\n";
+            infoString += $"<color=#FFCC00><b>Initiative:</b></color> <color=#FFE680>{stack.Initiative:F1}</color>\n";
+            infoString += $"<color=#66FFBB><b>Morale:</b></color> <color={moraleColor}>+{stack.Morale}</color>\n";
+            infoString += $"<color=#FFFF55><b>Luck:</b></color> <color={luckColor}>+{stack.Luck}</color>\n";
             
             string rangeType = stack.Data.IsRanged ? $"Ranged (Ammo: {stack.CurrentAmmo}/{stack.Data.MaxAmmo})" : "Melee";
-            infoString += $"<b>Attack Type:</b> {rangeType}  |  <b>Power:</b> {stack.TroopPower} (Single: {stack.Data.AIValue})\n\n";
+            infoString += $"<color=#E066FF><b>Attack Type:</b></color> <color=#F0B3FF>{rangeType}</color>\n";
+            infoString += $"<color=#FF44AA><b>Total Power:</b></color> <color=#FF99DD>{stack.TroopPower}</color>\n";
 
             // Add abilities if they exist
             string abilitiesList = "";
@@ -968,10 +1051,167 @@ namespace HommClone.UI
                 abilitiesList = "<color=#888888>None</color>";
             }
 
-            infoString += $"<b>Special Abilities:</b> {abilitiesList}\n";
-            infoString += $"<b>Active Effects:</b> {effectsList}\n";
+            infoString += $"<color=#FFFF88><b>Special Abilities:</b></color> <color=#FFFFDD>{abilitiesList}</color>\n";
+            infoString += $"<color=#88CCFF><b>Active Effects:</b></color> <color=#CCEEFF>{effectsList}</color>";
 
             stats.text = infoString;
+        }
+
+        private void CreateUnitInfoPanelUI()
+        {
+            // Create root panel with Gold Frame & Dark Slate Background (Taller: 540x510)
+            _unitInfoPanel = new GameObject("UnitInfoPanel");
+            _unitInfoPanel.transform.SetParent(_canvasObj.transform, false);
+
+            RectTransform rect = _unitInfoPanel.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(540f, 510f);
+
+            Image borderImg = _unitInfoPanel.AddComponent<Image>();
+            borderImg.color = new Color(0.82f, 0.68f, 0.32f, 1f); // Rich Warm Gold Frame
+
+            GameObject innerPanel = new GameObject("InnerPanel");
+            innerPanel.transform.SetParent(_unitInfoPanel.transform, false);
+            RectTransform inRect = innerPanel.AddComponent<RectTransform>();
+            inRect.anchorMin = Vector2.zero;
+            inRect.anchorMax = Vector2.one;
+            inRect.offsetMin = new Vector2(5f, 5f);
+            inRect.offsetMax = new Vector2(-5f, -5f);
+            Image bg = innerPanel.AddComponent<Image>();
+            bg.color = new Color(0.11f, 0.13f, 0.17f, 0.98f); // Deep Dark Slate Background
+
+            // 1. TOP HEADER: Title Text (Upper Left)
+            GameObject titleObj = new GameObject("TitleText");
+            titleObj.transform.SetParent(innerPanel.transform, false);
+            TextMeshProUGUI titleText = titleObj.AddComponent<TextMeshProUGUI>();
+            titleText.alignment = TextAlignmentOptions.MidlineLeft;
+            titleText.fontSize = 20;
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.color = new Color(1f, 0.84f, 0f); // Bright Gold
+            
+            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.04f, 0.91f);
+            titleRect.anchorMax = new Vector2(0.85f, 0.97f);
+            titleRect.offsetMin = Vector2.zero;
+            titleRect.offsetMax = Vector2.zero;
+
+            // 2. CLOSE BUTTON [X] (Upper Right)
+            GameObject closeXObj = new GameObject("CloseXBtn");
+            closeXObj.transform.SetParent(innerPanel.transform, false);
+            RectTransform xBtnRect = closeXObj.AddComponent<RectTransform>();
+            xBtnRect.anchorMin = new Vector2(0.88f, 0.91f);
+            xBtnRect.anchorMax = new Vector2(0.96f, 0.97f);
+            xBtnRect.offsetMin = Vector2.zero;
+            xBtnRect.offsetMax = Vector2.zero;
+            Image xImg = closeXObj.AddComponent<Image>();
+            xImg.color = new Color(0.6f, 0.15f, 0.15f, 1f);
+            Outline xOutline = closeXObj.AddComponent<Outline>();
+            xOutline.effectColor = new Color(0.9f, 0.3f, 0.3f, 1f);
+            xOutline.effectDistance = new Vector2(1.5f, 1.5f);
+            Button xBtn = closeXObj.AddComponent<Button>();
+            xBtn.onClick.AddListener(() => HideUnitInfoPanel());
+
+            GameObject xTxtObj = new GameObject("XText");
+            xTxtObj.transform.SetParent(closeXObj.transform, false);
+            TextMeshProUGUI xTxt = xTxtObj.AddComponent<TextMeshProUGUI>();
+            xTxt.alignment = TextAlignmentOptions.Center;
+            xTxt.fontSize = 14;
+            xTxt.fontStyle = FontStyles.Bold;
+            xTxt.color = Color.white;
+            xTxt.text = "<b>X</b>";
+            RectTransform xTxtRect = xTxtObj.GetComponent<RectTransform>();
+            xTxtRect.anchorMin = Vector2.zero;
+            xTxtRect.anchorMax = Vector2.one;
+            xTxtRect.offsetMin = Vector2.zero;
+            xTxtRect.offsetMax = Vector2.zero;
+
+            // 3. ICON PORTRAIT FRAME (Left Side - Tall Portrait Card)
+            GameObject iconFrameObj = new GameObject("IconFrame");
+            iconFrameObj.transform.SetParent(innerPanel.transform, false);
+            RectTransform iconFrameRect = iconFrameObj.AddComponent<RectTransform>();
+            iconFrameRect.anchorMin = new Vector2(0.04f, 0.10f);
+            iconFrameRect.anchorMax = new Vector2(0.34f, 0.88f);
+            iconFrameRect.offsetMin = Vector2.zero;
+            iconFrameRect.offsetMax = Vector2.zero;
+            Image iconFrameBg = iconFrameObj.AddComponent<Image>();
+            iconFrameBg.color = new Color(0.07f, 0.08f, 0.11f, 1f);
+            Outline iconOutline = iconFrameObj.AddComponent<Outline>();
+            iconOutline.effectColor = new Color(0.75f, 0.62f, 0.3f, 1f);
+            iconOutline.effectDistance = new Vector2(2f, 2f);
+
+            GameObject iconObj = new GameObject("CreatureIcon");
+            iconObj.transform.SetParent(iconFrameObj.transform, false);
+            Image iconImg = iconObj.AddComponent<Image>();
+            iconImg.preserveAspect = true;
+            RectTransform iconRect = iconObj.GetComponent<RectTransform>();
+            iconRect.anchorMin = Vector2.zero;
+            iconRect.anchorMax = Vector2.one;
+            iconRect.offsetMin = new Vector2(4f, 4f);
+            iconRect.offsetMax = new Vector2(-4f, -4f);
+
+            // 4. DETAILS CARD BLOCK (Right Side - Vertical Stats List)
+            GameObject cardObj = new GameObject("DetailsCard");
+            cardObj.transform.SetParent(innerPanel.transform, false);
+            RectTransform cardRect = cardObj.AddComponent<RectTransform>();
+            cardRect.anchorMin = new Vector2(0.36f, 0.10f);
+            cardRect.anchorMax = new Vector2(0.96f, 0.88f);
+            cardRect.offsetMin = Vector2.zero;
+            cardRect.offsetMax = Vector2.zero;
+            Image cardBg = cardObj.AddComponent<Image>();
+            cardBg.color = new Color(0.08f, 0.10f, 0.13f, 0.9f);
+            Outline cardOutline = cardObj.AddComponent<Outline>();
+            cardOutline.effectColor = new Color(0.3f, 0.35f, 0.45f, 0.8f);
+            cardOutline.effectDistance = new Vector2(1f, 1f);
+
+            GameObject statsObj = new GameObject("StatsText");
+            statsObj.transform.SetParent(cardObj.transform, false);
+            TextMeshProUGUI statsText = statsObj.AddComponent<TextMeshProUGUI>();
+            statsText.alignment = TextAlignmentOptions.TopLeft;
+            statsText.fontSize = 13;
+            statsText.color = Color.white;
+            statsText.lineSpacing = 4f;
+
+            RectTransform statsRect = statsObj.GetComponent<RectTransform>();
+            statsRect.anchorMin = Vector2.zero;
+            statsRect.anchorMax = Vector2.one;
+            statsRect.offsetMin = new Vector2(12f, 8f);
+            statsRect.offsetMax = new Vector2(-12f, -8f);
+
+            // 5. BOTTOM CLOSE BUTTON
+            GameObject closeObj = new GameObject("CloseButton");
+            closeObj.transform.SetParent(innerPanel.transform, false);
+            RectTransform closeRect = closeObj.AddComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(0.38f, 0.02f);
+            closeRect.anchorMax = new Vector2(0.62f, 0.09f);
+            closeRect.offsetMin = Vector2.zero;
+            closeRect.offsetMax = Vector2.zero;
+
+            Image closeImg = closeObj.AddComponent<Image>();
+            closeImg.color = new Color(0.45f, 0.15f, 0.15f, 1f);
+            Outline closeOutline = closeObj.AddComponent<Outline>();
+            closeOutline.effectColor = new Color(0.75f, 0.3f, 0.3f, 1f);
+            closeOutline.effectDistance = new Vector2(1.5f, 1.5f);
+
+            Button closeBtn = closeObj.AddComponent<Button>();
+            closeBtn.onClick.AddListener(() => HideUnitInfoPanel());
+
+            GameObject closeLblObj = new GameObject("Label");
+            closeLblObj.transform.SetParent(closeObj.transform, false);
+            TextMeshProUGUI closeLbl = closeLblObj.AddComponent<TextMeshProUGUI>();
+            closeLbl.alignment = TextAlignmentOptions.Center;
+            closeLbl.fontSize = 12;
+            closeLbl.fontStyle = FontStyles.Bold;
+            closeLbl.color = Color.white;
+            closeLbl.text = "<b>CLOSE</b>";
+
+            RectTransform closeLblRect = closeLblObj.GetComponent<RectTransform>();
+            closeLblRect.anchorMin = Vector2.zero;
+            closeLblRect.anchorMax = Vector2.one;
+            closeLblRect.offsetMin = Vector2.zero;
+            closeLblRect.offsetMax = Vector2.zero;
         }
 
         public void ShowHeroInfoPanel(Heroes.Hero hero)
@@ -979,93 +1219,20 @@ namespace HommClone.UI
             if (hero == null) return;
             HideSpellBook();
 
+            if (_unitInfoPanel != null && _unitInfoPanel.transform.Find("InnerPanel") == null)
+            {
+                Destroy(_unitInfoPanel);
+                _unitInfoPanel = null;
+            }
+
             if (_unitInfoPanel == null)
             {
-                // Trigger creation of _unitInfoPanel structure via a dummy stack check or manual creation
-                // Since ShowUnitInfoPanel builds _unitInfoPanel if null, we can build the UI box directly
-                _unitInfoPanel = new GameObject("UnitInfoPanel");
-                _unitInfoPanel.transform.SetParent(_canvasObj.transform, false);
-
-                RectTransform rect = _unitInfoPanel.AddComponent<RectTransform>();
-                rect.anchorMin = new Vector2(0.5f, 0.5f);
-                rect.anchorMax = new Vector2(0.5f, 0.5f);
-                rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.anchoredPosition = Vector2.zero;
-                rect.sizeDelta = new Vector2(420f, 320f);
-
-                Image bg = _unitInfoPanel.AddComponent<Image>();
-                bg.color = new Color(0.12f, 0.12f, 0.14f, 0.95f);
-
-                Outline outline = _unitInfoPanel.AddComponent<Outline>();
-                outline.effectColor = activeFrameColor;
-                outline.effectDistance = new Vector2(2f, 2f);
-
-                GameObject titleObj = new GameObject("TitleText");
-                titleObj.transform.SetParent(_unitInfoPanel.transform, false);
-                TextMeshProUGUI titleText = titleObj.AddComponent<TextMeshProUGUI>();
-                titleText.alignment = TextAlignmentOptions.Top;
-                titleText.fontSize = 18;
-                titleText.fontStyle = FontStyles.Bold;
-                titleText.color = Color.yellow;
-                
-                RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-                titleRect.anchorMin = new Vector2(0f, 1f);
-                titleRect.anchorMax = new Vector2(1f, 1f);
-                titleRect.pivot = new Vector2(0.5f, 1f);
-                titleRect.anchoredPosition = new Vector2(0f, -10f);
-                titleRect.sizeDelta = new Vector2(-20f, 30f);
-
-                GameObject statsObj = new GameObject("StatsText");
-                statsObj.transform.SetParent(_unitInfoPanel.transform, false);
-                TextMeshProUGUI statsText = statsObj.AddComponent<TextMeshProUGUI>();
-                statsText.alignment = TextAlignmentOptions.TopLeft;
-                statsText.fontSize = 13;
-                statsText.color = Color.white;
-
-                RectTransform statsRect = statsObj.GetComponent<RectTransform>();
-                statsRect.anchorMin = Vector2.zero;
-                statsRect.anchorMax = Vector2.one;
-                statsRect.offsetMin = new Vector2(15f, 50f);
-                statsRect.offsetMax = new Vector2(-15f, -45f);
-
-                GameObject closeObj = new GameObject("CloseButton");
-                closeObj.transform.SetParent(_unitInfoPanel.transform, false);
-                RectTransform closeRect = closeObj.AddComponent<RectTransform>();
-                closeRect.anchorMin = new Vector2(0.5f, 0f);
-                closeRect.anchorMax = new Vector2(0.5f, 0f);
-                closeRect.pivot = new Vector2(0.5f, 0f);
-                closeRect.anchoredPosition = new Vector2(0f, 12f);
-                closeRect.sizeDelta = new Vector2(100f, 28f);
-
-                Image closeImg = closeObj.AddComponent<Image>();
-                closeImg.color = new Color(0.3f, 0.15f, 0.15f, 1f);
-
-                Button closeBtn = closeObj.AddComponent<Button>();
-                closeBtn.onClick.AddListener(() => HideUnitInfoPanel());
-
-                GameObject closeLblObj = new GameObject("Label");
-                closeLblObj.transform.SetParent(closeObj.transform, false);
-                TextMeshProUGUI closeLbl = closeLblObj.AddComponent<TextMeshProUGUI>();
-                closeLbl.alignment = TextAlignmentOptions.Center;
-                closeLbl.fontSize = 11;
-                closeLbl.fontStyle = FontStyles.Bold;
-                closeLbl.color = Color.white;
-                closeLbl.text = "CLOSE";
-
-                RectTransform closeLblRect = closeLblObj.GetComponent<RectTransform>();
-                closeLblRect.anchorMin = Vector2.zero;
-                closeLblRect.anchorMax = Vector2.one;
-                closeLblRect.sizeDelta = Vector2.zero;
+                CreateUnitInfoPanelUI();
             }
 
             _unitInfoPanel.SetActive(true);
 
-            var title = _unitInfoPanel.transform.Find("TitleText").GetComponent<TextMeshProUGUI>();
-            title.text = $"<color=#FFD700><b>[HERO] {hero.Name}</b></color> (Player {hero.PlayerIndex})";
-
-            var stats = _unitInfoPanel.transform.Find("StatsText").GetComponent<TextMeshProUGUI>();
-
-            // Get hero data from GameDataManager to format artifact bonuses
+            // Get hero data from GameDataManager to format artifact bonuses & portrait
             var gameData = HommClone.World.GameDataManager.GetOrCreateInstance();
             HommClone.World.HeroData heroData = null;
             if (gameData != null)
@@ -1080,26 +1247,55 @@ namespace HommClone.UI
                 }
             }
 
+            // Populate Hero Icon
+            var iconImg = _unitInfoPanel.transform.Find("InnerPanel/IconFrame/CreatureIcon")?.GetComponent<Image>();
+            Sprite heroSprite = (heroData != null && heroData.heroPortrait != null) ? heroData.heroPortrait : hero.Icon;
+            if (iconImg != null)
+            {
+                if (heroSprite != null)
+                {
+                    iconImg.gameObject.SetActive(true);
+                    iconImg.sprite = heroSprite;
+                    iconImg.color = Color.white;
+                }
+                else
+                {
+                    iconImg.gameObject.SetActive(false);
+                }
+            }
+
+            var title = _unitInfoPanel.transform.Find("InnerPanel/TitleText")?.GetComponent<TextMeshProUGUI>();
+            if (title != null) title.text = $"<color=#FFD700><b>[HERO] {hero.Name}</b></color> <size=80%>(Player {hero.PlayerIndex})</size>";
+
+            var stats = _unitInfoPanel.transform.Find("InnerPanel/DetailsCard/StatsText")?.GetComponent<TextMeshProUGUI>();
+
+            // Format Hero stats VERTICALLY with distinct professional colors
             string infoString = "";
-            infoString += $"<color=#FF6666><b>Attack:</b></color> {hero.Attack}";
-            if (heroData != null) infoString += $" (Base: {heroData.attack})";
-            infoString += $"  |  <color=#66AAFF><b>Defense:</b></color> {hero.Defense}";
-            if (heroData != null) infoString += $" (Base: {heroData.defense})";
+            infoString += $"<color=#FF5555><b>Attack:</b></color> <color=#FF9999>{hero.Attack}</color>";
+            if (heroData != null) infoString += $" <size=80%>(Base: {heroData.attack})</size>";
             infoString += "\n";
 
-            infoString += $"<color=#CC66FF><b>Spell Power:</b></color> {hero.SpellPower}";
-            if (heroData != null) infoString += $" (Base: {heroData.spellPower})";
-            infoString += $"  |  <color=#FFCC00><b>Knowledge:</b></color> {hero.Knowledge}";
-            if (heroData != null) infoString += $" (Base: {heroData.knowledge})";
+            infoString += $"<color=#44AAFF><b>Defense:</b></color> <color=#99CCFF>{hero.Defense}</color>";
+            if (heroData != null) infoString += $" <size=80%>(Base: {heroData.defense})</size>";
             infoString += "\n";
 
-            infoString += $"<b>Mana:</b> {hero.CurrentMana} / {hero.MaxMana}  |  <b>Initiative:</b> {hero.Initiative:F1}\n";
+            infoString += $"<color=#CC66FF><b>Spell Power:</b></color> <color=#E6B3FF>{hero.SpellPower}</color>";
+            if (heroData != null) infoString += $" <size=80%>(Base: {heroData.spellPower})</size>";
+            infoString += "\n";
+
+            infoString += $"<color=#FFCC00><b>Knowledge:</b></color> <color=#FFE680>{hero.Knowledge}</color>";
+            if (heroData != null) infoString += $" <size=80%>(Base: {heroData.knowledge})</size>";
+            infoString += "\n";
+
+            infoString += $"<color=#33CCFF><b>Mana Pool:</b></color> <color=#99E6FF>{hero.CurrentMana} / {hero.MaxMana}</color>\n";
+            infoString += $"<color=#FF8844><b>Initiative:</b></color> <color=#FFBB99>{hero.Initiative:F1}</color>\n";
 
             int morale = heroData != null ? heroData.GetTotalMorale() : hero.Morale;
             int luck = heroData != null ? heroData.GetTotalLuck() : hero.Luck;
-            string moraleColor = morale > 0 ? "#44ff44" : (morale < 0 ? "#ff4444" : "#ffffff");
-            string luckColor = luck > 0 ? "#44ff44" : (luck < 0 ? "#ff4444" : "#ffffff");
-            infoString += $"<b>Morale Boost to Army:</b> <color={moraleColor}>+{morale}</color>  |  <b>Luck Boost:</b> <color={luckColor}>+{luck}</color>\n\n";
+            string moraleColor = morale > 0 ? "#44FF44" : (morale < 0 ? "#FF4444" : "#FFFFFF");
+            string luckColor = luck > 0 ? "#FFFF44" : (luck < 0 ? "#FF4444" : "#FFFFFF");
+            infoString += $"<color=#66FFBB><b>Morale Boost:</b></color> <color={moraleColor}>+{morale}</color>\n";
+            infoString += $"<color=#FFFF55><b>Luck Boost:</b></color> <color={luckColor}>+{luck}</color>\n\n";
 
             string artifactsFormatted = "";
             if (heroData != null && heroData.equippedArtifacts != null && heroData.equippedArtifacts.Count > 0)
@@ -1116,7 +1312,7 @@ namespace HommClone.UI
                 artifactsFormatted = "<color=#888888>None</color>";
             }
 
-            infoString += $"<color=#FFFF88><b>Equipped Artifacts:</b></color> {artifactsFormatted}\n";
+            infoString += $"<color=#FFFF88><b>Equipped Artifacts:</b></color> <color=#FFFFDD>{artifactsFormatted}</color>";
 
             stats.text = infoString;
         }

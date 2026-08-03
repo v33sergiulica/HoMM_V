@@ -27,6 +27,7 @@ namespace HommClone.Audio
         [SerializeField] private AudioClip buttonClickSound;
         [SerializeField] private AudioClip victorySound;
         [SerializeField] private AudioClip defeatSound;
+        [SerializeField] private AudioClip pickupNotificationSound;
 
         [Header("SFX Timing Offsets (Seconds Delay)")]
         [SerializeField] private float meleeSoundDelay = 0.0f;
@@ -211,6 +212,12 @@ namespace HommClone.Audio
         {
             StopMusic();
             PlaySFXWithDelay(defeatSound, 0f);
+        }
+
+        public void PlayNotificationSound(AudioClip customClip = null)
+        {
+            AudioClip clip = customClip != null ? customClip : pickupNotificationSound;
+            if (clip != null) PlaySFXWithDelay(clip, 0f);
         }
 
         public void PlaySFXWithDelay(AudioClip clip, float delay, float volumeScale = 1.0f)

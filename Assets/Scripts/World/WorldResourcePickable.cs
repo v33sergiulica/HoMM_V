@@ -45,17 +45,31 @@ namespace HommClone.World
         public void Collect(int playerIndex)
         {
             var gameData = GameDataManager.GetOrCreateInstance();
-            if (gameData != null && playerIndex == 1)
+            if (gameData != null)
             {
-                switch (resourceType)
+                var targetRes = (playerIndex == 1) ? gameData.player1Resources : gameData.player2Resources;
+                if (targetRes != null)
                 {
-                    case ResourceType.Gold: gameData.player1Resources.gold += amount; break;
-                    case ResourceType.Wood: gameData.player1Resources.wood += amount; break;
-                    case ResourceType.Ore: gameData.player1Resources.ore += amount; break;
-                    case ResourceType.Gems: gameData.player1Resources.gems += amount; break;
+                    switch (resourceType)
+                    {
+                        case ResourceType.Gold: targetRes.gold += amount; break;
+                        case ResourceType.Wood: targetRes.wood += amount; break;
+                        case ResourceType.Ore: targetRes.ore += amount; break;
+                        case ResourceType.Gems: targetRes.gems += amount; break;
+                    }
                 }
 
                 Debug.Log($"[WorldResource] Player {playerIndex} collected +{amount} {resourceType}!");
+
+                Color resColor = (resourceType == ResourceType.Gold) ? new Color(1f, 0.85f, 0.3f) :
+                                 (resourceType == ResourceType.Wood) ? new Color(0.85f, 0.65f, 0.4f) :
+                                 (resourceType == ResourceType.Ore) ? new Color(0.7f, 0.75f, 0.85f) : new Color(0.4f, 0.9f, 0.95f);
+
+                UI.WorldNotificationUI.ShowNotification(
+                    "RESOURCE COLLECTED",
+                    $"Player {playerIndex} collected <b>+{amount:N0} {resourceType}</b>!",
+                    accentColor: resColor
+                );
             }
 
             var ui = FindFirstObjectByType<UI.ResourceBarUI>();

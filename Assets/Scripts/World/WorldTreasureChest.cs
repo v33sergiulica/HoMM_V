@@ -19,8 +19,24 @@ namespace HommClone.World
         public int GoldAmount => goldAmount;
         public int XpAmount => xpAmount;
 
+        private void Awake()
+        {
+            EnsureCollider();
+        }
+
+        private void EnsureCollider()
+        {
+            if (GetComponent<Collider>() == null)
+            {
+                var col = gameObject.AddComponent<BoxCollider>();
+                col.center = new Vector3(0f, 0.5f, 0f);
+                col.size = new Vector3(1f, 1f, 1f);
+            }
+        }
+
         private void Start()
         {
+            EnsureCollider();
             // Auto-align 3D world position to grid coordinate if grid manager exists
             var grid = FindFirstObjectByType<WorldGridManager>();
             if (grid != null)

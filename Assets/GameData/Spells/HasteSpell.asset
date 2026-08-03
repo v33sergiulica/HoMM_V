@@ -15,3 +15,6 @@ MonoBehaviour:
   spellName: Haste
   manaCost: 5
   spellType: 1
+  magicSchool: 0
+  icon: {fileID: 0}
+  description: 

@@ -62,6 +62,18 @@ namespace HommClone.Heroes
             currentMana = MaxMana;
         }
 
+        public void SyncSpellsFromData(HommClone.World.HeroData data)
+        {
+            spells.Clear();
+            if (data != null && data.knownSpells != null)
+            {
+                foreach (var s in data.knownSpells)
+                {
+                    if (s != null && !spells.Contains(s)) spells.Add(s);
+                }
+            }
+        }
+
         private void Awake()
         {
             EnsureCollider();

@@ -178,11 +178,21 @@ namespace HommClone.UI
         private void OnGoldChosen()
         {
             var dataManager = GameDataManager.GetOrCreateInstance();
-            if (dataManager != null && dataManager.player1Resources != null)
+            if (dataManager != null)
             {
-                dataManager.player1Resources.gold += _goldAmount;
-                Debug.Log($"[TreasureChestUI] Added +{_goldAmount} Gold to Player 1 Resources! Total Gold: {dataManager.player1Resources.gold}");
+                var res = dataManager.GetActiveResources();
+                if (res != null)
+                {
+                    res.gold += _goldAmount;
+                    Debug.Log($"[TreasureChestUI] Added +{_goldAmount} Gold to Player {dataManager.activePlayerIndex} Resources! Total Gold: {res.gold}");
+                }
             }
+
+            WorldNotificationUI.ShowNotification(
+                "TREASURE CLAIMED",
+                $"Acquired <b>+{_goldAmount:N0} Gold</b>!",
+                accentColor: new Color(1f, 0.85f, 0.3f)
+            );
 
             _panel.SetActive(false);
             _onChoiceMade?.Invoke();
@@ -194,6 +204,12 @@ namespace HommClone.UI
             {
                 bool leveledUp = _targetHero.GainXP(_xpAmount, out LevelUpInfo lvlInfo);
                 Debug.Log($"[TreasureChestUI] Hero {_targetHero.heroName} gained +{_xpAmount} XP! Current XP: {_targetHero.currentXP}/{_targetHero.xpToNextLevel}");
+
+                WorldNotificationUI.ShowNotification(
+                    "EXPERIENCE GAINED",
+                    $"<b>{_targetHero.heroName}</b> gained <b>+{_xpAmount:N0} XP</b>!",
+                    accentColor: new Color(0.4f, 0.85f, 1f)
+                );
 
                 _panel.SetActive(false);
 

@@ -45,14 +45,7 @@ namespace HommClone.Heroes
                             // Basic: +2 Def, Advanced: +3 Def, Expert: +4 Def
                             mods.defenseBonus += (int)skill.rank + 1;
                             break;
-                        case SecondarySkillType.Leadership:
-                            // Basic: +1 Morale, Advanced: +2 Morale, Expert: +3 Morale
-                            mods.moraleBonus += (int)skill.rank;
-                            break;
-                        case SecondarySkillType.Luck:
-                            // Basic: +1 Luck, Advanced: +2 Luck, Expert: +3 Luck
-                            mods.luckBonus += (int)skill.rank;
-                            break;
+                        // Leadership & Luck are already included in GetTotalMorale() and GetTotalLuck() above!
                     }
                 }
             }

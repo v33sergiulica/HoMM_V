@@ -289,10 +289,24 @@ namespace HommClone.Turns
             if (!p1Alive || !p2Alive)
             {
                 _activeParticipant = null;
-                string winner = p1Alive ? "Player 1" : (p2Alive ? "Player 2" : "No one");
-                Debug.Log($"[TurnManager] Battle completed! Winner: {winner}");
 
                 var manager = HommClone.World.GameDataManager.GetOrCreateInstance();
+                bool isPvP = manager != null && manager.isPvPBattle;
+                int activePlayerIdx = manager != null ? manager.activePlayerIndex : 1;
+
+                string winner;
+                if (isPvP)
+                {
+                    winner = p1Alive ? "Player 1" : (p2Alive ? "Player 2" : "No one");
+                }
+                else
+                {
+                    // In PvE combat, Side 1 (p1Alive) is the active player's hero army!
+                    winner = p1Alive ? $"Player {activePlayerIdx}" : "Monsters";
+                }
+
+                Debug.Log($"[TurnManager] Battle completed! Winner: {winner}");
+
                 if (manager != null)
                 {
                     manager.isReturningFromBattle = true;

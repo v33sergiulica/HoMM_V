@@ -1187,6 +1187,36 @@ namespace HommClone.Creatures
 
         /// <summary>
         /// Moves the stack smoothly along the given path of grid coordinates.
+        /// <summary>
+        /// Calculates the centered 3D world position for a grid coordinate, properly handling 2x2 large creatures.
+        /// </summary>
+        public Vector3 GetWorldPositionForGrid(Vector2Int pos)
+        {
+            var gm = FindFirstObjectByType<Grid.GridManager>();
+            if (gm != null)
+            {
+                var tile = gm.GetTileAt(pos);
+                if (tile != null)
+                {
+                    Vector3 tilePos = tile.transform.position;
+                    if (IsLarge)
+                    {
+                        var diagonalTile = gm.GetTileAt(new Vector2Int(pos.x + 1, pos.y + 1));
+                        if (diagonalTile != null)
+                        {
+                            Vector3 diagPos = diagonalTile.transform.position;
+                            return new Vector3((tilePos.x + diagPos.x) / 2f, (tilePos.y + diagPos.y) / 2f + heightOffset, (tilePos.z + diagPos.z) / 2f);
+                        }
+                        return new Vector3(tilePos.x + 0.5f, tilePos.y + heightOffset, tilePos.z + 0.5f);
+                    }
+                    return new Vector3(tilePos.x, tilePos.y + heightOffset, tilePos.z);
+                }
+            }
+            return transform.position;
+        }
+
+        /// <summary>
+        /// Moves the stack smoothly along a 2D tile grid path.
         /// Optional attackTarget triggers the cinematic camera on the final step.
         /// </summary>
         public System.Collections.IEnumerator MoveAlongPathCoroutine(System.Collections.Generic.List<Vector2Int> path, System.Action onComplete, CreatureStack attackTarget = null)
@@ -1223,7 +1253,7 @@ namespace HommClone.Creatures
                 Tile tile = gridManager.GetTileAt(node);
                 if (tile != null)
                 {
-                    Vector3 targetPos = new Vector3(tile.transform.position.x, tile.transform.position.y + heightOffset, tile.transform.position.z);
+                    Vector3 targetPos = GetWorldPositionForGrid(node);
                     Vector3 startPos = transform.position;
                     float elapsed = 0f;
                     float duration = 0.2f; // Time to travel between adjacent tiles
@@ -1295,38 +1325,7 @@ namespace HommClone.Creatures
         [ContextMenu("Snap to Grid Position")]
         public void SnapToGridPosition()
         {
-            var gridManager = FindFirstObjectByType<Grid.GridManager>();
-            if (gridManager != null)
-            {
-                var tile = gridManager.GetTileAt(gridPosition);
-                if (tile != null)
-                {
-                    Vector3 tilePos = tile.transform.position;
-                    if (IsLarge)
-                    {
-                        var diagonalTile = gridManager.GetTileAt(new Vector2Int(gridPosition.x + 1, gridPosition.y + 1));
-                        if (diagonalTile != null)
-                        {
-                            Vector3 diagPos = diagonalTile.transform.position;
-                            transform.position = new Vector3((tilePos.x + diagPos.x) / 2f, (tilePos.y + diagPos.y) / 2f + heightOffset, (tilePos.z + diagPos.z) / 2f);
-                        }
-                        else
-                        {
-                            // Fallback assuming standard spacing of 1.0 (X and Z)
-                            transform.position = new Vector3(tilePos.x + 0.5f, tilePos.y + heightOffset, tilePos.z + 0.5f);
-                        }
-                    }
-                    else
-                    {
-                        // Snap world position: Grid Y maps to World Z
-                        transform.position = new Vector3(tilePos.x, tilePos.y + heightOffset, tilePos.z);
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning($"[CreatureStack] Grid Position {gridPosition} is out of bounds for snapping {gameObject.name}!");
-                }
-            }
+            transform.position = GetWorldPositionForGrid(gridPosition);
         }
 
         private void Start()
@@ -1344,17 +1343,6 @@ namespace HommClone.Creatures
             SnapToGridPosition();
             FaceDefaultDirection();
         }
-    }
-
-    /// <summary>
-    /// Level of mastery/knowledge a caster possesses for spell formulas.
-    /// </summary>
-    public enum SpellMastery
-    {
-        Basic,
-        Intermediate,
-        Advanced,
-        Expert
     }
 
     /// <summary>

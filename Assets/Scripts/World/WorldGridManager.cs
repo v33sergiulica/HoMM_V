@@ -138,6 +138,18 @@ namespace HommClone.World
 
         public Vector3 GetTileWorldPosition(Vector2Int gridPos) => GridToWorldPosition(gridPos);
 
+        public Vector2Int WorldToGridPosition(Vector3 worldPos)
+        {
+            int x = Mathf.RoundToInt(worldPos.x / tileSize);
+            int y = Mathf.RoundToInt(worldPos.z / tileSize);
+            return new Vector2Int(x, y);
+        }
+
+        public bool IsValidGridPosition(Vector2Int gridPos)
+        {
+            return gridPos.x >= 0 && gridPos.x < width && gridPos.y >= 0 && gridPos.y < height;
+        }
+
         public WorldTile GetTileAt(Vector2Int gridPos)
         {
             if (_grid.TryGetValue(gridPos, out WorldTile tile))

@@ -15,3 +15,6 @@ MonoBehaviour:
   spellName: FireBall
   manaCost: 9
   spellType: 0
+  magicSchool: 2
+  icon: {fileID: 21300000, guid: 08790ea716e4d33419ab8caba55532d1, type: 3}
+  description: A blazing fireball!

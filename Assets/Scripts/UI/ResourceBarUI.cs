@@ -61,14 +61,17 @@ namespace HommClone.UI
             var gameData = GameDataManager.GetOrCreateInstance();
             if (gameData == null) return;
 
-            var res = gameData.player1Resources;
+            int activePlayer = gameData.activePlayerIndex;
+            var res = gameData.GetActiveResources();
+            if (res == null) return;
 
-            // Calculate daily income rates from owned mines
+            // Calculate daily income rates from owned mines for active player
             int dailyGold = 0, dailyWood = 0, dailyOre = 0, dailyGems = 0;
             var mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
             foreach (var m in mines)
             {
-                if (m.OwnerPlayerIndex == 1)
+                int owner = gameData.GetSavedMineOwner(m.GridPosition, m.OwnerPlayerIndex);
+                if (owner == activePlayer)
                 {
                     switch (m.MineType)
                     {
@@ -80,7 +83,8 @@ namespace HommClone.UI
                 }
             }
 
-            if (_goldText != null) _goldText.text = $"<color=#FFDD44><b>GOLD:</b></color> {res.gold} <size=80%>(+{(dailyGold > 0 ? dailyGold.ToString() : "0")}/day)</size>";
+            string pLabel = $"P{activePlayer}";
+            if (_goldText != null) _goldText.text = $"<color=#FFDD44><b>{pLabel} GOLD:</b></color> {res.gold} <size=80%>(+{(dailyGold > 0 ? dailyGold.ToString() : "0")}/day)</size>";
             if (_woodText != null) _woodText.text = $"<color=#DDAA66><b>WOOD:</b></color> {res.wood} <size=80%>(+{(dailyWood > 0 ? dailyWood.ToString() : "0")}/day)</size>";
             if (_oreText != null) _oreText.text = $"<color=#AABBCC><b>ORE:</b></color> {res.ore} <size=80%>(+{(dailyOre > 0 ? dailyOre.ToString() : "0")}/day)</size>";
             if (_gemsText != null) _gemsText.text = $"<color=#66EEEE><b>GEMS:</b></color> {res.gems} <size=80%>(+{(dailyGems > 0 ? dailyGems.ToString() : "0")}/day)</size>";

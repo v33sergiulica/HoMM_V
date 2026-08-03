@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using HommClone.Grid;
 using HommClone.Creatures;
 using HommClone.Turns;
+using HommClone.Spells;
 
 namespace HommClone.Interaction
 {
@@ -782,12 +783,35 @@ namespace HommClone.Interaction
             if (unit == null || unit.IsDead || _gridManager == null) return;
             var reachable = _gridManager.GetReachableTiles(unit.GridPosition, unit.Speed, unit.Data.IsFlying, unit.IsLarge);
             Color fadedGrey = new Color(0.45f, 0.45f, 0.52f, 0.6f); // Soft slate grey
-            foreach (var pos in reachable.Keys)
+
+            if (unit.IsLarge)
             {
-                Tile tile = _gridManager.GetTileAt(pos);
-                if (tile != null)
+                HashSet<Vector2Int> reachableBodyTiles = new HashSet<Vector2Int>();
+                foreach (var pos in reachable.Keys)
                 {
-                    tile.SetColor(fadedGrey);
+                    reachableBodyTiles.Add(pos);
+                    reachableBodyTiles.Add(new Vector2Int(pos.x + 1, pos.y));
+                    reachableBodyTiles.Add(new Vector2Int(pos.x, pos.y + 1));
+                    reachableBodyTiles.Add(new Vector2Int(pos.x + 1, pos.y + 1));
+                }
+                foreach (var pos in reachableBodyTiles)
+                {
+                    Tile tile = _gridManager.GetTileAt(pos);
+                    if (tile != null)
+                    {
+                        tile.SetColor(fadedGrey);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var pos in reachable.Keys)
+                {
+                    Tile tile = _gridManager.GetTileAt(pos);
+                    if (tile != null)
+                    {
+                        tile.SetColor(fadedGrey);
+                    }
                 }
             }
         }

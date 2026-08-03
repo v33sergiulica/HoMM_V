@@ -1405,7 +1405,8 @@ namespace HommClone.Turns
             if (leftHeroData != null)
             {
                 p1Hero.SetStats(leftHeroData.GetTotalAttack(), leftHeroData.GetTotalDefense(), leftHeroData.GetTotalSpellPower(), leftHeroData.GetTotalKnowledge(), leftHeroData.heroName, leftHeroData.heroPortrait, 1);
-                Debug.Log($"[Hero Stats Applied] Left Sideline Hero '{p1Hero.Name}' stats set from '{leftHeroData.heroName}' (with Artifacts) -> Attack: {p1Hero.Attack}, Defense: {p1Hero.Defense}, SpellPower: {p1Hero.SpellPower}, Knowledge: {p1Hero.Knowledge}");
+                p1Hero.SyncSpellsFromData(leftHeroData);
+                Debug.Log($"[Hero Stats Applied] Left Sideline Hero '{p1Hero.Name}' stats set from '{leftHeroData.heroName}' (with Artifacts) -> Attack: {p1Hero.Attack}, Defense: {p1Hero.Defense}, SpellPower: {p1Hero.SpellPower}, Knowledge: {p1Hero.Knowledge}, Known Spells: {p1Hero.Spells.Count}");
             }
 
             // Spawn Player 2 Hero 3D Object at Sideline Right ONLY in PVP mode
@@ -1424,6 +1425,7 @@ namespace HommClone.Turns
                 Sprite portrait = data != null ? data.heroPortrait : null;
 
                 p2Hero.SetStats(att, def, sp, kn, hName, portrait, 2);
+                if (data != null) p2Hero.SyncSpellsFromData(data);
 
                 var view = p2Obj.AddComponent<Heroes.Hero3DView>();
                 GameObject customPrefab = data != null ? data.heroPrefab : null;

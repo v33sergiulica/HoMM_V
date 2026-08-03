@@ -43,7 +43,10 @@ namespace HommClone.World
             var manager = GameDataManager.GetOrCreateInstance();
             if (manager != null)
             {
-                manager.activePlayerIndex = 1; // Always start game on Player 1's turn
+                if (!manager.isReturningFromBattle && manager.activePlayerIndex <= 0)
+                {
+                    manager.activePlayerIndex = 1; // Start game on Player 1's turn if unassigned
+                }
             }
 
             UI.ResourceBarUI.GetOrCreateInstance();
@@ -77,27 +80,27 @@ namespace HommClone.World
             var manager = GameDataManager.GetOrCreateInstance();
             WorldHero[] heroes = FindObjectsByType<WorldHero>(FindObjectsSortMode.None);
 
-            WorldHero p1Hero = null;
-            WorldHero p2Hero = null;
+            WorldHero p1Hero = System.Array.Find(heroes, h => h != null && (h.PlayerIndex == 1 || h.gameObject.name.Contains("Player1")));
+            WorldHero p2Hero = System.Array.Find(heroes, h => h != null && (h.PlayerIndex == 2 || h.gameObject.name.Contains("Player2")));
 
-            if (heroes != null && heroes.Length > 0)
+            if (p1Hero == null && heroes != null && heroes.Length > 0)
             {
-                // Sort heroes deterministically by grid distance to (0,0) so Player 1 and Player 2 are never inverted!
-                System.Array.Sort(heroes, (a, b) =>
-                {
-                    int distA = a.GridPosition.x + a.GridPosition.y;
-                    int distB = b.GridPosition.x + b.GridPosition.y;
-                    return distA.CompareTo(distB);
-                });
-
                 p1Hero = heroes[0];
                 p1Hero.SetPlayerIndexAndPosition(1, p1Hero.GridPosition != Vector2Int.zero ? p1Hero.GridPosition : new Vector2Int(2, 2));
+            }
+            else if (p1Hero != null)
+            {
+                p1Hero.SetPlayerIndexAndPosition(1, p1Hero.GridPosition != Vector2Int.zero ? p1Hero.GridPosition : new Vector2Int(2, 2));
+            }
 
-                if (heroes.Length >= 2)
-                {
-                    p2Hero = heroes[1];
-                    p2Hero.SetPlayerIndexAndPosition(2, p2Hero.GridPosition != Vector2Int.zero ? p2Hero.GridPosition : new Vector2Int(18, 18));
-                }
+            if (p2Hero == null && heroes != null && heroes.Length >= 2 && heroes[1] != p1Hero)
+            {
+                p2Hero = heroes[1];
+                p2Hero.SetPlayerIndexAndPosition(2, p2Hero.GridPosition != Vector2Int.zero ? p2Hero.GridPosition : new Vector2Int(18, 18));
+            }
+            else if (p2Hero != null)
+            {
+                p2Hero.SetPlayerIndexAndPosition(2, p2Hero.GridPosition != Vector2Int.zero ? p2Hero.GridPosition : new Vector2Int(18, 18));
             }
 
             if (p2Hero == null)
@@ -155,7 +158,7 @@ namespace HommClone.World
                     {
                         if (mine != null && (mine.GridPosition == monsterPos || Vector2Int.Distance(mine.GridPosition, monsterPos) <= 1.5f))
                         {
-                            mine.ClaimMine(1);
+                            mine.ClaimMine(manager.activePlayerIndex);
                         }
                     }
 
@@ -164,7 +167,7 @@ namespace HommClone.World
                     {
                         if (p != null && (p.GridPosition == monsterPos || Vector2Int.Distance(p.GridPosition, monsterPos) <= 1.5f))
                         {
-                            p.Collect(1);
+                            p.Collect(manager.activePlayerIndex);
                         }
                     }
 
@@ -175,6 +178,12 @@ namespace HommClone.World
                     {
                         bool leveledUp = winnerHero.GainXP(xpReward, out LevelUpInfo lvlInfo);
                         Debug.Log($"[WorldMapManager] Hero {winnerHero.heroName} gained {xpReward} XP! Current XP: {winnerHero.currentXP}/{winnerHero.xpToNextLevel} (Level {winnerHero.level})");
+
+                        UI.WorldNotificationUI.ShowNotification(
+                            "VICTORY REWARD!",
+                            $"<b>{winnerHero.heroName}</b> won the battle and gained <b>+{xpReward:N0} XP</b>!",
+                            accentColor: new Color(0.4f, 0.85f, 1f)
+                        );
 
                         if (leveledUp)
                         {
@@ -282,11 +291,25 @@ namespace HommClone.World
                     WorldTile tile = hit.collider.GetComponentInParent<WorldTile>() ?? hit.collider.GetComponent<WorldTile>();
                     WorldMonsterStack targetMonster = hit.collider.GetComponentInParent<WorldMonsterStack>() ?? hit.collider.GetComponent<WorldMonsterStack>();
                     WorldHero targetHero = hit.collider.GetComponentInParent<WorldHero>() ?? hit.collider.GetComponent<WorldHero>();
+                    WorldTreasureChest targetChest = hit.collider.GetComponentInParent<WorldTreasureChest>() ?? hit.collider.GetComponent<WorldTreasureChest>();
+                    WorldResourcePickable targetPickable = hit.collider.GetComponentInParent<WorldResourcePickable>() ?? hit.collider.GetComponent<WorldResourcePickable>();
+                    WorldMine targetMine = hit.collider.GetComponentInParent<WorldMine>() ?? hit.collider.GetComponent<WorldMine>();
 
                     Vector2Int targetPos = new Vector2Int(-1, -1);
                     if (targetMonster != null) targetPos = targetMonster.GridPosition;
                     else if (targetHero != null && targetHero != _activeHero) targetPos = targetHero.GridPosition;
+                    else if (targetChest != null) targetPos = targetChest.GridPosition;
+                    else if (targetPickable != null) targetPos = targetPickable.GridPosition;
+                    else if (targetMine != null) targetPos = targetMine.GridPosition;
                     else if (tile != null) targetPos = tile.GridPosition;
+                    else if (_gridManager != null)
+                    {
+                        Vector2Int hitGrid = _gridManager.WorldToGridPosition(hit.point);
+                        if (_gridManager.IsValidGridPosition(hitGrid))
+                        {
+                            targetPos = hitGrid;
+                        }
+                    }
 
                     if (targetPos != new Vector2Int(-1, -1) && targetPos != _activeHero.GridPosition)
                     {
@@ -443,8 +466,8 @@ namespace HommClone.World
                     }
                     else
                     {
-                        p.Collect(1);
-                        return false;
+                        p.Collect(manager != null ? manager.activePlayerIndex : 1);
+                        return true; // Resource collected -> stop movement at this tile!
                     }
                 }
             }
@@ -463,8 +486,8 @@ namespace HommClone.World
                     }
                     else
                     {
-                        mine.ClaimMine(1);
-                        return false;
+                        mine.ClaimMine(manager != null ? manager.activePlayerIndex : 1);
+                        return true; // Mine claimed -> stop movement at this tile!
                     }
                 }
             }
@@ -485,7 +508,28 @@ namespace HommClone.World
                     {
                         HeroData heroData = _activeHero != null ? _activeHero.Data : GameDataManager.GetOrCreateInstance().player1Hero;
                         chest.Interact(heroData);
-                        return false;
+                        return true; // Chest opened -> stop movement at this tile!
+                    }
+                }
+            }
+
+            // 5. Check Magic Shrines (Must step on shrine tile)
+            WorldSpellShrine[] shrines = FindObjectsByType<WorldSpellShrine>(FindObjectsSortMode.None);
+            foreach (var shrine in shrines)
+            {
+                if (shrine != null && shrine.GridPosition == heroPos)
+                {
+                    if (CheckGuardedInteraction(shrine.GridPosition, out var guardMonster))
+                    {
+                        Debug.Log($"[WorldMapManager] Magic Shrine at {shrine.GridPosition} is guarded by monster at {guardMonster.GridPosition}! Triggering battle!");
+                        TriggerBattleEncounter(guardMonster);
+                        return true; // Battle triggered!
+                    }
+                    else
+                    {
+                        HeroData heroData = _activeHero != null ? _activeHero.Data : GameDataManager.GetOrCreateInstance().player1Hero;
+                        shrine.Interact(heroData);
+                        return true; // Shrine visited -> stop movement at this tile!
                     }
                 }
             }

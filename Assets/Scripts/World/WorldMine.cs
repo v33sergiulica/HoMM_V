@@ -40,7 +40,15 @@ namespace HommClone.World
             {
                 transform.position = grid.GetTileWorldPosition(gridPosition);
             }
+
+            var gameData = GameDataManager.Instance;
+            if (gameData != null)
+            {
+                ownerPlayerIndex = gameData.GetSavedMineOwner(gridPosition, ownerPlayerIndex);
+            }
+
             SetupMineVisuals();
+            UpdateFlagColor();
         }
 
         public void Initialize(ResourceType type, int income, Vector2Int pos, int owner = 0)
@@ -50,6 +58,12 @@ namespace HommClone.World
             gridPosition = pos;
             ownerPlayerIndex = owner;
 
+            var gameData = GameDataManager.Instance;
+            if (gameData != null)
+            {
+                ownerPlayerIndex = gameData.GetSavedMineOwner(gridPosition, ownerPlayerIndex);
+            }
+
             // Align to 3D world grid position
             var grid = FindFirstObjectByType<WorldGridManager>();
             if (grid != null)
@@ -58,14 +72,29 @@ namespace HommClone.World
             }
 
             SetupMineVisuals();
+            UpdateFlagColor();
         }
 
         public void ClaimMine(int playerIndex)
         {
             ownerPlayerIndex = playerIndex;
+            
+            var gameData = GameDataManager.Instance;
+            if (gameData != null)
+            {
+                gameData.SaveMineOwner(gridPosition, playerIndex);
+            }
+
             UpdateFlagColor();
 
             Debug.Log($"[WorldMine] Mine at {gridPosition} claimed by Player {playerIndex}! Daily Income: +{dailyIncome} {mineType}");
+
+            Color mineColor = (playerIndex == 1) ? new Color(0.3f, 0.65f, 1f) : new Color(1f, 0.35f, 0.35f);
+            UI.WorldNotificationUI.ShowNotification(
+                "MINE CAPTURED",
+                $"Player {playerIndex} captured <b>{mineType} Mine</b> (<b>+{dailyIncome}/day</b>)!",
+                accentColor: mineColor
+            );
 
             var ui = FindFirstObjectByType<UI.ResourceBarUI>();
             if (ui != null) ui.UpdateUI();

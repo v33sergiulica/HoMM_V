@@ -61,6 +61,41 @@ namespace HommClone.World
 
         public int adventureSkillTokens = 1; // Starts with 1 token for initial customization!
         public List<string> unlockedAdventureSkills = new List<string>();
+        public List<HommClone.Spells.Spell> knownSpells = new List<HommClone.Spells.Spell>();
+
+        public bool TeachSpell(HommClone.Spells.Spell spell)
+        {
+            if (spell == null) return false;
+            if (knownSpells == null) knownSpells = new List<HommClone.Spells.Spell>();
+            if (!knownSpells.Contains(spell))
+            {
+                knownSpells.Add(spell);
+                return true;
+            }
+            return false;
+        }
+
+        public HommClone.Spells.SpellMastery GetSchoolMastery(HommClone.Spells.MagicSchool school)
+        {
+            if (secondarySkills == null) return HommClone.Spells.SpellMastery.Basic;
+            HommClone.Heroes.SecondarySkillType targetSkill = HommClone.Heroes.SecondarySkillType.LightMagic;
+            switch (school)
+            {
+                case HommClone.Spells.MagicSchool.Light: targetSkill = HommClone.Heroes.SecondarySkillType.LightMagic; break;
+                case HommClone.Spells.MagicSchool.Dark: targetSkill = HommClone.Heroes.SecondarySkillType.DarkMagic; break;
+                case HommClone.Spells.MagicSchool.Destructive: targetSkill = HommClone.Heroes.SecondarySkillType.DestructiveMagic; break;
+            }
+
+            var slot = secondarySkills.Find(s => s != null && s.type == targetSkill);
+            if (slot == null) return HommClone.Spells.SpellMastery.Basic;
+            switch (slot.rank)
+            {
+                case HommClone.Heroes.SkillRank.Basic: return HommClone.Spells.SpellMastery.Basic;
+                case HommClone.Heroes.SkillRank.Advanced: return HommClone.Spells.SpellMastery.Advanced;
+                case HommClone.Heroes.SkillRank.Expert: return HommClone.Spells.SpellMastery.Expert;
+                default: return HommClone.Spells.SpellMastery.Basic;
+            }
+        }
 
         // Artifact Inventory & Equipment State
         public List<HommClone.Artifacts.ArtifactData> equippedArtifacts = new List<HommClone.Artifacts.ArtifactData>();
@@ -131,6 +166,16 @@ namespace HommClone.World
             int bonus = 0;
             foreach (var a in equippedArtifacts) if (a != null) bonus += a.moraleBonus;
             foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.moraleBonus;
+            if (secondarySkills != null)
+            {
+                foreach (var skill in secondarySkills)
+                {
+                    if (skill.type == HommClone.Heroes.SecondarySkillType.Leadership)
+                    {
+                        bonus += (int)skill.rank;
+                    }
+                }
+            }
             return bonus;
         }
 
@@ -139,6 +184,16 @@ namespace HommClone.World
             int bonus = 0;
             foreach (var a in equippedArtifacts) if (a != null) bonus += a.luckBonus;
             foreach (var setBonus in GetActiveSetBonuses()) bonus += setBonus.luckBonus;
+            if (secondarySkills != null)
+            {
+                foreach (var skill in secondarySkills)
+                {
+                    if (skill.type == HommClone.Heroes.SecondarySkillType.Luck)
+                    {
+                        bonus += (int)skill.rank;
+                    }
+                }
+            }
             return bonus;
         }
 
@@ -307,13 +362,44 @@ namespace HommClone.World
             return activePlayerIndex == 1 ? player1Resources : player2Resources;
         }
 
+        [System.Serializable]
+        public class SavedMineData
+        {
+            public Vector2Int gridPosition;
+            public int ownerPlayerIndex;
+        }
+
+        public List<SavedMineData> savedMines = new List<SavedMineData>();
+
+        public void SaveMineOwner(Vector2Int pos, int ownerIndex)
+        {
+            var existing = savedMines.Find(m => m.gridPosition == pos);
+            if (existing != null)
+            {
+                existing.ownerPlayerIndex = ownerIndex;
+            }
+            else
+            {
+                savedMines.Add(new SavedMineData { gridPosition = pos, ownerPlayerIndex = ownerIndex });
+            }
+        }
+
+        public int GetSavedMineOwner(Vector2Int pos, int defaultOwner = 0)
+        {
+            var existing = savedMines.Find(m => m.gridPosition == pos);
+            return existing != null ? existing.ownerPlayerIndex : defaultOwner;
+        }
+
         public void ProcessDailyIncome()
         {
             WorldMine[] mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
             foreach (var mine in mines)
             {
-                if (mine == null || mine.OwnerPlayerIndex == 0) continue;
-                PlayerResources targetRes = (mine.OwnerPlayerIndex == 1) ? player1Resources : player2Resources;
+                if (mine == null) continue;
+                int owner = GetSavedMineOwner(mine.GridPosition, mine.OwnerPlayerIndex);
+                if (owner == 0) continue;
+
+                PlayerResources targetRes = (owner == 1) ? player1Resources : player2Resources;
 
                 if (targetRes != null)
                 {
@@ -325,7 +411,7 @@ namespace HommClone.World
                         case ResourceType.Ore: targetRes.ore += finalIncome; break;
                         case ResourceType.Gems: targetRes.gems += finalIncome; break;
                     }
-                    Debug.Log($"[GameDataManager] Daily Income: Player {mine.OwnerPlayerIndex} received +{finalIncome} {mine.Type} from mine at {mine.GridPosition}!");
+                    Debug.Log($"[GameDataManager] Daily Income: Player {owner} received +{finalIncome} {mine.Type} from mine at {mine.GridPosition}!");
                 }
             }
         }
@@ -451,6 +537,9 @@ namespace HommClone.World
                 CreatureData t1 = availableCreatures[0];
                 player2Hero.army.Add(new ArmySlot(t1, 150));
             }
+
+            if (player1Hero.knownSpells == null) player1Hero.knownSpells = new List<HommClone.Spells.Spell>();
+            if (player2Hero.knownSpells == null) player2Hero.knownSpells = new List<HommClone.Spells.Spell>();
         }
 
         public void ProcessDaySkip()
@@ -459,28 +548,12 @@ namespace HommClone.World
             currentWeek = ((currentDay - 1) / 7) + 1;
             currentMonth = ((currentDay - 1) / 28) + 1;
 
-            // Award daily production from all owned mines
-            var mines = FindObjectsByType<WorldMine>(FindObjectsSortMode.None);
-            int goldGained = 0, woodGained = 0, oreGained = 0, gemsGained = 0;
+            // Award daily production from all owned mines for all players
+            ProcessDailyIncome();
 
-            foreach (var mine in mines)
-            {
-                if (mine != null && mine.OwnerPlayerIndex == 1)
-                {
-                    switch (mine.MineType)
-                    {
-                        case ResourceType.Gold: player1Resources.gold += mine.DailyIncome; goldGained += mine.DailyIncome; break;
-                        case ResourceType.Wood: player1Resources.wood += mine.DailyIncome; woodGained += mine.DailyIncome; break;
-                        case ResourceType.Ore: player1Resources.ore += mine.DailyIncome; oreGained += mine.DailyIncome; break;
-                        case ResourceType.Gems: player1Resources.gems += mine.DailyIncome; gemsGained += mine.DailyIncome; break;
-                    }
-                }
-            }
-
-            Debug.Log($"[Day Skip] Day {currentDay} (Month {currentMonth}, Week {currentWeek}). Daily Income Gained -> Gold: +{goldGained}, Wood: +{woodGained}, Ore: +{oreGained}, Gems: +{gemsGained}");
-
-            // Reset Hero Movement Points on Day Skip!
+            // Reset Hero Movement Points for all heroes on Day Skip!
             ResetHeroMovement(player1Hero);
+            ResetHeroMovement(player2Hero);
 
             // Update Resource Bar UI
             var resUI = FindFirstObjectByType<UI.ResourceBarUI>();
