@@ -973,5 +973,152 @@ namespace HommClone.UI
 
             stats.text = infoString;
         }
+
+        public void ShowHeroInfoPanel(Heroes.Hero hero)
+        {
+            if (hero == null) return;
+            HideSpellBook();
+
+            if (_unitInfoPanel == null)
+            {
+                // Trigger creation of _unitInfoPanel structure via a dummy stack check or manual creation
+                // Since ShowUnitInfoPanel builds _unitInfoPanel if null, we can build the UI box directly
+                _unitInfoPanel = new GameObject("UnitInfoPanel");
+                _unitInfoPanel.transform.SetParent(_canvasObj.transform, false);
+
+                RectTransform rect = _unitInfoPanel.AddComponent<RectTransform>();
+                rect.anchorMin = new Vector2(0.5f, 0.5f);
+                rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = Vector2.zero;
+                rect.sizeDelta = new Vector2(420f, 320f);
+
+                Image bg = _unitInfoPanel.AddComponent<Image>();
+                bg.color = new Color(0.12f, 0.12f, 0.14f, 0.95f);
+
+                Outline outline = _unitInfoPanel.AddComponent<Outline>();
+                outline.effectColor = activeFrameColor;
+                outline.effectDistance = new Vector2(2f, 2f);
+
+                GameObject titleObj = new GameObject("TitleText");
+                titleObj.transform.SetParent(_unitInfoPanel.transform, false);
+                TextMeshProUGUI titleText = titleObj.AddComponent<TextMeshProUGUI>();
+                titleText.alignment = TextAlignmentOptions.Top;
+                titleText.fontSize = 18;
+                titleText.fontStyle = FontStyles.Bold;
+                titleText.color = Color.yellow;
+                
+                RectTransform titleRect = titleObj.GetComponent<RectTransform>();
+                titleRect.anchorMin = new Vector2(0f, 1f);
+                titleRect.anchorMax = new Vector2(1f, 1f);
+                titleRect.pivot = new Vector2(0.5f, 1f);
+                titleRect.anchoredPosition = new Vector2(0f, -10f);
+                titleRect.sizeDelta = new Vector2(-20f, 30f);
+
+                GameObject statsObj = new GameObject("StatsText");
+                statsObj.transform.SetParent(_unitInfoPanel.transform, false);
+                TextMeshProUGUI statsText = statsObj.AddComponent<TextMeshProUGUI>();
+                statsText.alignment = TextAlignmentOptions.TopLeft;
+                statsText.fontSize = 13;
+                statsText.color = Color.white;
+
+                RectTransform statsRect = statsObj.GetComponent<RectTransform>();
+                statsRect.anchorMin = Vector2.zero;
+                statsRect.anchorMax = Vector2.one;
+                statsRect.offsetMin = new Vector2(15f, 50f);
+                statsRect.offsetMax = new Vector2(-15f, -45f);
+
+                GameObject closeObj = new GameObject("CloseButton");
+                closeObj.transform.SetParent(_unitInfoPanel.transform, false);
+                RectTransform closeRect = closeObj.AddComponent<RectTransform>();
+                closeRect.anchorMin = new Vector2(0.5f, 0f);
+                closeRect.anchorMax = new Vector2(0.5f, 0f);
+                closeRect.pivot = new Vector2(0.5f, 0f);
+                closeRect.anchoredPosition = new Vector2(0f, 12f);
+                closeRect.sizeDelta = new Vector2(100f, 28f);
+
+                Image closeImg = closeObj.AddComponent<Image>();
+                closeImg.color = new Color(0.3f, 0.15f, 0.15f, 1f);
+
+                Button closeBtn = closeObj.AddComponent<Button>();
+                closeBtn.onClick.AddListener(() => HideUnitInfoPanel());
+
+                GameObject closeLblObj = new GameObject("Label");
+                closeLblObj.transform.SetParent(closeObj.transform, false);
+                TextMeshProUGUI closeLbl = closeLblObj.AddComponent<TextMeshProUGUI>();
+                closeLbl.alignment = TextAlignmentOptions.Center;
+                closeLbl.fontSize = 11;
+                closeLbl.fontStyle = FontStyles.Bold;
+                closeLbl.color = Color.white;
+                closeLbl.text = "CLOSE";
+
+                RectTransform closeLblRect = closeLblObj.GetComponent<RectTransform>();
+                closeLblRect.anchorMin = Vector2.zero;
+                closeLblRect.anchorMax = Vector2.one;
+                closeLblRect.sizeDelta = Vector2.zero;
+            }
+
+            _unitInfoPanel.SetActive(true);
+
+            var title = _unitInfoPanel.transform.Find("TitleText").GetComponent<TextMeshProUGUI>();
+            title.text = $"<color=#FFD700><b>[HERO] {hero.Name}</b></color> (Player {hero.PlayerIndex})";
+
+            var stats = _unitInfoPanel.transform.Find("StatsText").GetComponent<TextMeshProUGUI>();
+
+            // Get hero data from GameDataManager to format artifact bonuses
+            var gameData = HommClone.World.GameDataManager.GetOrCreateInstance();
+            HommClone.World.HeroData heroData = null;
+            if (gameData != null)
+            {
+                if (gameData.isPvPBattle)
+                {
+                    heroData = (hero.PlayerIndex == 1) ? gameData.player1Hero : gameData.player2Hero;
+                }
+                else
+                {
+                    heroData = (hero.PlayerIndex == 1) ? gameData.GetActiveHero() : null;
+                }
+            }
+
+            string infoString = "";
+            infoString += $"<color=#FF6666><b>Attack:</b></color> {hero.Attack}";
+            if (heroData != null) infoString += $" (Base: {heroData.attack})";
+            infoString += $"  |  <color=#66AAFF><b>Defense:</b></color> {hero.Defense}";
+            if (heroData != null) infoString += $" (Base: {heroData.defense})";
+            infoString += "\n";
+
+            infoString += $"<color=#CC66FF><b>Spell Power:</b></color> {hero.SpellPower}";
+            if (heroData != null) infoString += $" (Base: {heroData.spellPower})";
+            infoString += $"  |  <color=#FFCC00><b>Knowledge:</b></color> {hero.Knowledge}";
+            if (heroData != null) infoString += $" (Base: {heroData.knowledge})";
+            infoString += "\n";
+
+            infoString += $"<b>Mana:</b> {hero.CurrentMana} / {hero.MaxMana}  |  <b>Initiative:</b> {hero.Initiative:F1}\n";
+
+            int morale = heroData != null ? heroData.GetTotalMorale() : hero.Morale;
+            int luck = heroData != null ? heroData.GetTotalLuck() : hero.Luck;
+            string moraleColor = morale > 0 ? "#44ff44" : (morale < 0 ? "#ff4444" : "#ffffff");
+            string luckColor = luck > 0 ? "#44ff44" : (luck < 0 ? "#ff4444" : "#ffffff");
+            infoString += $"<b>Morale Boost to Army:</b> <color={moraleColor}>+{morale}</color>  |  <b>Luck Boost:</b> <color={luckColor}>+{luck}</color>\n\n";
+
+            string artifactsFormatted = "";
+            if (heroData != null && heroData.equippedArtifacts != null && heroData.equippedArtifacts.Count > 0)
+            {
+                List<string> artNames = new List<string>();
+                foreach (var art in heroData.equippedArtifacts)
+                {
+                    if (art != null) artNames.Add(art.name);
+                }
+                artifactsFormatted = string.Join(", ", artNames);
+            }
+            else
+            {
+                artifactsFormatted = "<color=#888888>None</color>";
+            }
+
+            infoString += $"<color=#FFFF88><b>Equipped Artifacts:</b></color> {artifactsFormatted}\n";
+
+            stats.text = infoString;
+        }
     }
 }

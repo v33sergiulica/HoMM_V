@@ -129,7 +129,22 @@ namespace HommClone.World
                     secSkillsFormatted = "\n<color=#FFFF88><b>Skills:</b></color> None";
                 }
 
-                _statsText.text = $"<color=#FFD700><b>Level {data.level}</b></color> | XP: <b>{data.currentXP} / {data.xpToNextLevel}</b>\n<color=#FF6666><b>Attack:</b></color> {data.attack}    <color=#66AAFF><b>Defense:</b></color> {data.defense}    <color=#CC66FF><b>Power:</b></color> {data.spellPower}    <color=#FFCC00><b>Knowledge:</b></color> {data.knowledge}{secSkillsFormatted}";
+                int totalAtk = data.GetTotalAttack();
+                int totalDef = data.GetTotalDefense();
+                int totalSp = data.GetTotalSpellPower();
+                int totalKnw = data.GetTotalKnowledge();
+                int morale = data.GetTotalMorale();
+                int luck = data.GetTotalLuck();
+
+                string atkStr = totalAtk != data.attack ? $"{totalAtk} <size=80%>(Base: {data.attack})</size>" : $"{data.attack}";
+                string defStr = totalDef != data.defense ? $"{totalDef} <size=80%>(Base: {data.defense})</size>" : $"{data.defense}";
+                string spStr = totalSp != data.spellPower ? $"{totalSp} <size=80%>(Base: {data.spellPower})</size>" : $"{data.spellPower}";
+                string knwStr = totalKnw != data.knowledge ? $"{totalKnw} <size=80%>(Base: {data.knowledge})</size>" : $"{data.knowledge}";
+
+                _statsText.text = $"<color=#FFD700><b>Level {data.level}</b></color> | XP: <b>{data.currentXP} / {data.xpToNextLevel}</b>\n" +
+                                  $"<color=#FF6666><b>Attack:</b></color> {atkStr}    <color=#66AAFF><b>Defense:</b></color> {defStr}    <color=#CC66FF><b>Power:</b></color> {spStr}    <color=#FFCC00><b>Knowledge:</b></color> {knwStr}\n" +
+                                  $"<color=#44FF44><b>Morale:</b></color> +{morale}    <color=#FFFF44><b>Luck:</b></color> +{luck}" +
+                                  $"{secSkillsFormatted}";
             }
 
             if (_mpText != null)

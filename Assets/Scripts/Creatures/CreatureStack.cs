@@ -95,7 +95,16 @@ namespace HommClone.Creatures
             var manager = GameDataManager.Instance;
             if (manager == null) return;
 
-            HeroData hero = (playerIndex == 1) ? manager.player1Hero : manager.player2Hero;
+            HeroData hero = null;
+            if (manager.isPvPBattle)
+            {
+                hero = (playerIndex == 1) ? manager.player1Hero : manager.player2Hero;
+            }
+            else
+            {
+                hero = (playerIndex == 1) ? manager.GetActiveHero() : null;
+            }
+
             if (hero != null)
             {
                 var mods = Heroes.HeroBattleModifiers.FromHero(hero);
@@ -104,7 +113,7 @@ namespace HommClone.Creatures
                 _moraleModifier += mods.moraleBonus;
                 _luckModifier += mods.luckBonus;
 
-                Debug.Log($"[HeroBattleModifiers] Applied Hero Mods to {gameObject.name} (P{playerIndex}): +{mods.attackBonus} Att, +{mods.defenseBonus} Def, +{mods.moraleBonus} Morale, +{mods.luckBonus} Luck");
+                Debug.Log($"[HeroBattleModifiers] Applied Hero Mods from '{hero.heroName}' to {gameObject.name} (P{playerIndex}): +{mods.attackBonus} Att, +{mods.defenseBonus} Def, +{mods.moraleBonus} Morale, +{mods.luckBonus} Luck");
             }
         }
 
@@ -417,11 +426,12 @@ namespace HommClone.Creatures
             set => _heroOwner = value;
         }
 
-        public int Attack => (creatureData != null ? creatureData.Attack : 0) + _attackBonus + (HeroOwner != null ? HeroOwner.Attack : 0);
-        public int Defense => (creatureData != null ? creatureData.Defense : 0) + _defenseBonus + (HeroOwner != null ? HeroOwner.Defense : 0);
+        public int Attack => (creatureData != null ? creatureData.Attack : 0) + _attackBonus;
+        public int Defense => (creatureData != null ? creatureData.Defense : 0) + _defenseBonus;
         public int Speed => Mathf.Max(1, (creatureData != null ? creatureData.Speed : 0) + _speedModifier);
         public int Morale => baseMorale + _moraleModifier;
         public int Luck => baseLuck + _luckModifier;
+        public bool HasHadGoodMoraleExtraTurn { get; set; } = false;
         public List<ActiveStatusEffect> ActiveEffects => activeEffects;
 
         public void AddAttackBonus(int amount) => _attackBonus += amount;
@@ -576,6 +586,8 @@ namespace HommClone.Creatures
         /// </summary>
         public void OnTurnStart()
         {
+            HasHadGoodMoraleExtraTurn = false;
+
             // Reset retaliation status
             ResetRetaliation();
 

@@ -242,13 +242,11 @@ namespace HommClone.Turns
                 return;
             }
 
-            // Find heroes to apply passive morale & luck stat boosts to friendly troops
+            // Find heroes to link to friendly troops
             List<Heroes.Hero> heroes = activeParticipants.OfType<Heroes.Hero>().Where(h => h != null).ToList();
             List<CreatureStack> troops = activeParticipants.OfType<CreatureStack>().Where(s => s != null).ToList();
             foreach (var hero in heroes)
             {
-                int hMorale = hero.Morale;
-                int hLuck = hero.Luck;
                 int hOwner = hero.PlayerIndex;
 
                 foreach (var troop in troops)
@@ -256,8 +254,6 @@ namespace HommClone.Turns
                     if (troop != null && troop.PlayerIndex == hOwner)
                     {
                         troop.HeroOwner = hero;
-                        troop.AddMoraleModifier(hMorale);
-                        troop.AddLuckModifier(hLuck);
                         Debug.Log($"[Hero Boost] Hero {hero.Name} linked to friendly stack {troop.gameObject.name} (Boosts: +{hero.Attack} Atk, +{hero.Defense} Def)");
                     }
                 }
@@ -403,11 +399,12 @@ namespace HommClone.Turns
         {
             if (_activeParticipant == null) return;
 
-            if (_activeParticipant is CreatureStack activeStack && activeStack.Morale > 0)
+            if (_activeParticipant is CreatureStack activeStack && activeStack.Morale > 0 && !activeStack.HasHadGoodMoraleExtraTurn)
             {
                 float moraleChance = Mathf.Clamp(activeStack.Morale * 0.1f, 0f, 1f);
                 if (Random.value < moraleChance)
                 {
+                    activeStack.HasHadGoodMoraleExtraTurn = true;
                     Debug.Log($"[Good Morale] {activeStack.gameObject.name} got Good Morale! ATB set to 50.");
                     activeStack.ATB = 50f;
 
@@ -448,11 +445,12 @@ namespace HommClone.Turns
             {
                 stack.ApplyDefendBonus(defendBonusAmount);
 
-                if (stack.Morale > 0)
+                if (stack.Morale > 0 && !stack.HasHadGoodMoraleExtraTurn)
                 {
                     float moraleChance = Mathf.Clamp(stack.Morale * 0.1f, 0f, 1f);
                     if (Random.value < moraleChance)
                     {
+                        stack.HasHadGoodMoraleExtraTurn = true;
                         Debug.Log($"[Good Morale] {stack.gameObject.name} got Good Morale on Defend! ATB set to 50.");
                         stack.ATB = 50f;
 

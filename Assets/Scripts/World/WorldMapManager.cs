@@ -134,6 +134,7 @@ namespace HommClone.World
             if (manager != null && manager.isReturningFromBattle)
             {
                 manager.isReturningFromBattle = false;
+                manager.isPvPBattle = false;
                 if (manager.battleWon && manager.pendingBattleMonsterPosition != new Vector2Int(-1, -1))
                 {
                     Vector2Int monsterPos = manager.pendingBattleMonsterPosition;
@@ -167,20 +168,24 @@ namespace HommClone.World
                         }
                     }
 
-                    // Award Experience Points for winning the battle encounter
+                    // Award Experience Points for winning the battle encounter to the active hero
                     int xpReward = 1200;
-                    bool leveledUp = manager.player1Hero.GainXP(xpReward, out LevelUpInfo lvlInfo);
-                    Debug.Log($"[WorldMapManager] Hero {manager.player1Hero.heroName} gained {xpReward} XP! Current XP: {manager.player1Hero.currentXP}/{manager.player1Hero.xpToNextLevel} (Level {manager.player1Hero.level})");
-
-                    if (leveledUp)
+                    HeroData winnerHero = manager.GetActiveHero();
+                    if (winnerHero != null)
                     {
-                        var levelUpUI = UI.HeroLevelUpUI.Instance;
-                        if (levelUpUI == null)
+                        bool leveledUp = winnerHero.GainXP(xpReward, out LevelUpInfo lvlInfo);
+                        Debug.Log($"[WorldMapManager] Hero {winnerHero.heroName} gained {xpReward} XP! Current XP: {winnerHero.currentXP}/{winnerHero.xpToNextLevel} (Level {winnerHero.level})");
+
+                        if (leveledUp)
                         {
-                            GameObject uiObj = new GameObject("HeroLevelUpUI");
-                            levelUpUI = uiObj.AddComponent<UI.HeroLevelUpUI>();
+                            var levelUpUI = UI.HeroLevelUpUI.Instance;
+                            if (levelUpUI == null)
+                            {
+                                GameObject uiObj = new GameObject("HeroLevelUpUI");
+                                levelUpUI = uiObj.AddComponent<UI.HeroLevelUpUI>();
+                            }
+                            levelUpUI.ShowLevelUp(winnerHero, lvlInfo);
                         }
-                        levelUpUI.ShowLevelUp(manager.player1Hero, lvlInfo);
                     }
                 }
             }
@@ -494,6 +499,7 @@ namespace HommClone.World
             var manager = GameDataManager.GetOrCreateInstance();
             if (manager == null) return;
 
+            manager.isPvPBattle = false;
             manager.pendingBattleEnemyArmy.Clear();
             if (monster.CreatureData != null)
             {
@@ -780,7 +786,13 @@ namespace HommClone.World
                 if (h != null && h.PlayerIndex == manager.activePlayerIndex)
                 {
                     _activeHero = h;
-                    if (Camera.main != null)
+
+                    WorldCameraController camController = FindFirstObjectByType<WorldCameraController>();
+                    if (camController != null)
+                    {
+                        camController.SetTargetHero(h.transform);
+                    }
+                    else if (Camera.main != null)
                     {
                         Vector3 targetCam = h.transform.position;
                         targetCam.y = Camera.main.transform.position.y;

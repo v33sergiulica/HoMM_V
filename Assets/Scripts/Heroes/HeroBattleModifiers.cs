@@ -24,9 +24,11 @@ namespace HommClone.Heroes
             HeroBattleModifiers mods = new HeroBattleModifiers();
             if (hero == null) return mods;
 
-            // 1. Primary Attributes (Hero Attack & Defense add directly to army Attack & Defense!)
-            mods.attackBonus += hero.attack;
-            mods.defenseBonus += hero.defense;
+            // 1. Primary Attributes & Artifact/Set Bonuses (Hero Attack, Defense, Morale & Luck add directly to army!)
+            mods.attackBonus += hero.GetTotalAttack();
+            mods.defenseBonus += hero.GetTotalDefense();
+            mods.moraleBonus += hero.GetTotalMorale();
+            mods.luckBonus += hero.GetTotalLuck();
 
             // 2. Secondary Skills
             if (hero.secondarySkills != null)

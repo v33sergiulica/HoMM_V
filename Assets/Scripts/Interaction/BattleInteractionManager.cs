@@ -51,18 +51,28 @@ namespace HommClone.Interaction
                 return;
             }
 
-            // Handle right-click detailed info sheet on CreatureStacks
+            // Handle right-click detailed info sheet on CreatureStacks or Heroes
             if (!_isSpellTargetingMode && Mouse.current.rightButton.wasPressedThisFrame)
             {
                 Ray infoRay = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
                 if (Physics.Raycast(infoRay, out RaycastHit infoHit, 100f))
                 {
-                    CreatureStack stack = infoHit.collider.GetComponentInParent<CreatureStack>();
+                    CreatureStack stack = infoHit.collider.GetComponentInParent<CreatureStack>() ?? infoHit.collider.GetComponent<CreatureStack>();
                     if (stack != null && !stack.IsDead)
                     {
                         if (_uiManager != null)
                         {
                             _uiManager.ShowUnitInfoPanel(stack);
+                            return;
+                        }
+                    }
+
+                    Heroes.Hero hero = infoHit.collider.GetComponentInParent<Heroes.Hero>() ?? infoHit.collider.GetComponent<Heroes.Hero>();
+                    if (hero != null)
+                    {
+                        if (_uiManager != null)
+                        {
+                            _uiManager.ShowHeroInfoPanel(hero);
                             return;
                         }
                     }

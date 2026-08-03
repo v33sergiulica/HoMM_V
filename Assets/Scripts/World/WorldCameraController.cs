@@ -40,6 +40,16 @@ namespace HommClone.World
             }
         }
 
+        public void SetTargetHero(Transform heroTransform)
+        {
+            targetHero = heroTransform;
+            followHero = true;
+            if (targetHero != null)
+            {
+                transform.position = targetHero.position + defaultOffset;
+            }
+        }
+
         private void LateUpdate()
         {
             HandleInputs();

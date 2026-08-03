@@ -62,8 +62,25 @@ namespace HommClone.Heroes
             currentMana = MaxMana;
         }
 
+        private void Awake()
+        {
+            EnsureCollider();
+        }
+
+        private void EnsureCollider()
+        {
+            if (GetComponent<Collider>() == null)
+            {
+                var col = gameObject.AddComponent<CapsuleCollider>();
+                col.center = new Vector3(0f, 1f, 0f);
+                col.radius = 0.6f;
+                col.height = 2.0f;
+            }
+        }
+
         private void Start()
         {
+            EnsureCollider();
             // Set initial mana pool based on knowledge
             if (currentMana <= 0) currentMana = MaxMana;
         }
